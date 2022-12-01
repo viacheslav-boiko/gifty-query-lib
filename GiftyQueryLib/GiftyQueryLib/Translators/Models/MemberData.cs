@@ -21,15 +21,5 @@ namespace GiftyQueryLib.Translators.Models
         /// Info about Field or Property
         /// </summary>
         public MemberInfo? MemberInfo { get; init; }
-
-        /// <summary>
-        /// Method name (only if Member is Method)
-        /// </summary>
-        public string? MethodName { get; init; }
-
-        /// <summary>
-        /// Left Side Member Info
-        /// </summary>
-        public MemberInfo? LeftSideMemberInfo { get; init; }
     }
 }

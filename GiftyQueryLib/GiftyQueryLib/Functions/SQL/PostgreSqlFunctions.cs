@@ -466,11 +466,43 @@
 
         #endregion
 
+        #region PConcat Functions
+
+        /// <summary>
+        /// Transforms into <b>CONCAT(str1, str2, ...)</b> sql concatenation function
+        /// </summary>
+        /// <returns></returns>
+        public static string PConcat<T>(this T _, params object?[]? paramList) where T : class => string.Empty;
+
         #endregion
 
-        #region Custom Functions
+        #region PAlias Functions
 
-        
+        /// <summary>
+        /// Mark column that logic related to alias should be used
+        /// </summary>
+        /// <returns></returns>
+        public static double PDAlias<T>(this T _, string aliasName) where T : class => default;
+
+        /// <summary>
+        /// Mark column that logic related to alias should be used
+        /// </summary>
+        /// <returns></returns>
+        public static string PSAlias<T>(this T _, string aliasName) where T : class => string.Empty;
+
+        /// <summary>
+        /// Mark column that logic related to alias should be used
+        /// </summary>
+        /// <returns></returns>
+        public static DateTime PDTAlias<T>(this T _, string aliasName) where T : class => default;
+
+        /// <summary>
+        /// Mark column that logic related to alias should be used
+        /// </summary>
+        /// <returns></returns>
+        public static TimeSpan PTSAlias<T>(this T _, string aliasName) where T : class => default;
+
+        #endregion
 
         #endregion
     }

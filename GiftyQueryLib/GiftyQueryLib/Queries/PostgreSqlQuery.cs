@@ -3,7 +3,6 @@ using GiftyQueryLib.Enums;
 using GiftyQueryLib.Queries.QueryNodes;
 using GiftyQueryLib.Translators;
 using GiftyQueryLib.Translators.Models;
-using GiftyQueryLib.Translators.SelectorParsers;
 using GiftyQueryLib.Translators.SqlTranslators;
 using GiftyQueryLib.Utils;
 using System.ComponentModel.DataAnnotations;
@@ -197,7 +196,7 @@ namespace GiftyQueryLib.Queries
 
         public virtual IJoinNode<T> Join(Expression<Func<T, object>> selector, JoinType joinType = JoinType.Inner)
         {
-            var selectorData = SelectorParser.GetMemberData(selector);
+            var selectorData = conditionTranslator.GetMemberData(selector);
             ParseJoinExpression(selectorData, joinType);
 
             return this;
@@ -205,7 +204,7 @@ namespace GiftyQueryLib.Queries
 
         public virtual IJoinNode<T> Join<U>(Expression<Func<U, object>> selector, JoinType joinType = JoinType.Inner)
         {
-            var selectorData = SelectorParser.GetMemberData(selector);
+            var selectorData = conditionTranslator.GetMemberData(selector);
             ParseJoinExpression(selectorData, joinType);
 
             return this;
@@ -240,7 +239,7 @@ namespace GiftyQueryLib.Queries
 
             foreach (var (rowSelector, orderType) in rowsForOrdering)
             {
-                var data = SelectorParser.GetMemberData(rowSelector);
+                var data = conditionTranslator.GetMemberData(rowSelector);
                 string sqlOrderField = string.Format("\"{0}\".\"{1}\" ", data.CallerType!.ToCaseFormat(), data.MemberInfo?.Name.ToCaseFormat());
 
                 string sqlDirection = Enum.GetName(typeof(OrderType), (int)orderType)!;
@@ -280,7 +279,7 @@ namespace GiftyQueryLib.Queries
         private void ParseJoinExpression(MemberData selectorData, JoinType joinType)
         {
             var memberType = selectorData.MemberType;
-            var keyProp = memberType
+            var keyProp = memberType?
                 .GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true).FirstOrDefault(attr => attr is KeyAttribute) is not null);
 
             if (keyProp is null)
@@ -289,7 +288,7 @@ namespace GiftyQueryLib.Queries
                 throw new Exception("");
             }
 
-            if (memberType.IsValueType)
+            if (memberType!.IsValueType)
             {
                 //TODO: Text for exception
                 throw new Exception("");

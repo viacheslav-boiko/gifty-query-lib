@@ -1,4 +1,5 @@
 ﻿using GiftyQueryLib.Config;
+using GiftyQueryLib.Translators.Models;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -31,6 +32,11 @@ namespace GiftyQueryLib.Translators
         protected Dictionary<string, string> aggregateFunctions;
 
         /// <summary>
+        /// Aliases to bind already used logic to them
+        /// </summary>
+        protected Dictionary<string, string> aliases;
+
+        /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="caseType">Naming format</param>
@@ -41,6 +47,7 @@ namespace GiftyQueryLib.Translators
             type = null;
             expressionTypes = new();
             aggregateFunctions = new();
+            aliases = new();
         }
 
         /// <summary>
@@ -65,18 +72,42 @@ namespace GiftyQueryLib.Translators
         }
 
         /// <summary>
-        /// Converts an Expression statement into other language statement string
+        /// Parse Property Selector into simplified member data item
         /// </summary>
-        /// <param name="type"></param>
-        /// <param name="expression"></param>
-        /// <returns></returns>
-        protected virtual string Translate(Type type, Expression expression)
+        /// <param name="propertySelector">Property Row Selector</param>
+        /// <returns>Member Data</returns>
+        /// <exception cref="ArgumentException"></exception>
+        public virtual MemberData GetMemberData<TItem>(Expression<Func<TItem, object>> propertySelector)
         {
-            this.type = type;
-            Visit(new DynamicConstantVisitor().Visit(expression));
-            string result = sb.ToString();
-            sb = new StringBuilder();
-            return result;
+            var body = propertySelector?.Body;
+
+            if (body is null)
+                throw new ArgumentException($"The row selector is null");
+
+            if (body is MemberExpression memberExpression)
+            {
+                return new MemberData
+                {
+                    MemberType = body.Type,
+                    CallerType = memberExpression.Expression!.Type,
+                    MemberInfo = memberExpression.Member
+                };
+            }
+            else if (body is UnaryExpression unaryExpression)
+            {
+                var memberInfo = unaryExpression.Operand is MethodCallExpression methodExpression
+                    ? methodExpression.Method
+                    : ((MemberExpression)unaryExpression.Operand).Member;
+
+                return new MemberData
+                {
+                    MemberType = unaryExpression.Type,
+                    CallerType = null,
+                    MemberInfo = memberInfo
+                };
+            }
+            else
+                throw new ArgumentException($"Invalid expression was provided");
         }
 
         /// <summary>
@@ -92,6 +123,21 @@ namespace GiftyQueryLib.Translators
             }
 
             return string.Empty;
+        }
+
+        /// <summary>
+        /// Converts an Expression statement into other language statement string
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="expression"></param>
+        /// <returns></returns>
+        protected virtual string Translate(Type type, Expression expression)
+        {
+            this.type = type;
+            Visit(new DynamicConstantVisitor().Visit(expression));
+            string result = sb.ToString();
+            sb = new StringBuilder();
+            return result;
         }
 
         /// <summary>
