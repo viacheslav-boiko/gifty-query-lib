@@ -163,7 +163,7 @@ namespace GiftyQueryLib.Translators
                 return null;
 
             var foreignKeyAttr = memberInfo.CustomAttributes
-                        .FirstOrDefault(attr => (attributeTypes is null ? GiftyQueryConfig.ForeignKeyAttributes : attributeTypes).Any(type => attr.AttributeType == type));
+                        .FirstOrDefault(attr => (attributeTypes is null ? QueryConfig.ForeignKeyAttributes : attributeTypes).Any(type => attr.AttributeType == type));
 
             if (foreignKeyAttr is null)
                 return null;

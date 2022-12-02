@@ -6,6 +6,7 @@ using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using C = GiftyQueryLib.Config.QueryConfig;
 
 namespace GiftyQueryLib.Translators.SqlTranslators
 {
@@ -75,7 +76,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 foreach (var exp in newExpression.Arguments)
                 {
-                    string? paramName = newExpression?.Members?[i]?.Name?.ToString();
+                    string? paramName = newExpression?.Members?[i]?.Name?.ToString()?.ToCaseFormat();
 
                     if (exp is MemberExpression memberExp)
                         sb.Append(ParseMemberExpression(memberExp, paramName));
@@ -139,16 +140,16 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 foreach (var attr in attributeData)
                 {
-                    if (GiftyQueryConfig.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
-                    if (GiftyQueryConfig.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
+                    if (C.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
+                    if (C.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
                 }
 
                 if (notMappedAttrData is not null || (exceptSelector is not null && exceptMembers.Any(it => it.Name == property.Name)))
                     continue;
 
                 sb.Append(foreignKeyAttrData is not null
-                    ? string.Format("\"{0}\".\"{1}\",", type.ToCaseFormat(), foreignKeyAttrData.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat())
-                    : string.Format("\"{0}\".\"{1}\",", type.ToCaseFormat(), property.Name.ToCaseFormat()));
+                    ? string.Format(C.ColumnAccessFormat + ",", C.Scheme, type.ToCaseFormat(), foreignKeyAttrData.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat())
+                    : string.Format(C.ColumnAccessFormat + ",", C.Scheme, type.ToCaseFormat(), property.Name.ToCaseFormat()));
             }
 
             var parsed = sb.ToString();
@@ -165,17 +166,17 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         {
             var sb = new StringBuilder();
 
-            if (!GiftyQueryConfig.NotMappedAttributes.Any(attr => memberExp.Member.GetCustomAttribute(attr) is not null))
+            if (!C.NotMappedAttributes.Any(attr => memberExp.Member.GetCustomAttribute(attr) is not null))
             {
                 var memberAttributes = GetMemberAttributeArguments(memberExp.Member);
                 var memberName = memberAttributes is null
-                    ? string.Format("\"{0}\"", memberExp.Member.Name.ToCaseFormat())
+                    ? memberExp.Member.Name.ToCaseFormat()
                     : memberAttributes.FirstOrDefault().ToString();
 
-                if (memberExp.Member.Name == paramName)
-                    sb.AppendFormat("\"{0}\".{1},", memberExp.Expression?.Type.ToCaseFormat(), memberName);
+                if (memberName == paramName)
+                    sb.AppendFormat(C.ColumnAccessFormat + ",", C.Scheme, memberExp.Expression?.Type.ToCaseFormat(), memberName);
                 else
-                    sb.AppendFormat("\"{0}\".{1} AS \"{2}\",", memberExp.Expression?.Type.ToCaseFormat(), memberName, paramName);
+                    sb.AppendFormat(C.ColumnAccessFormat + " AS {3},", C.Scheme, memberExp.Expression?.Type.ToCaseFormat(), memberName, paramName);
             }
 
             return sb.ToString();
@@ -240,7 +241,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                                     var fkArgument = GetMemberAttributeArguments(mExp?.Member)?.FirstOrDefault();
 
                                     var memeberName = fkArgument?.Value is not null ? fkArgument.Value.ToString() : mExp?.Member.Name.ToCaseFormat();
-                                    return string.Format("\"{0}\".\"{1}\"", mExp?.Expression?.Type.ToCaseFormat(), memeberName);
+                                    return string.Format(C.ColumnAccessFormat, C.Scheme, mExp?.Expression?.Type.ToCaseFormat(), memeberName);
                                 }
                                 else if (it is UnaryExpression uExp)
                                 {
@@ -258,8 +259,8 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                             });
 
-                            return string.Format(aggregateFunctions[methodName], string.Join(',', columns)) + (paramName is null ? "" : " AS \"" + paramName + "\"");
-                        }
+                            return string.Format(aggregateFunctions[methodName], string.Join(',', columns)) + (paramName is null ? "" : " AS " + paramName);
+                        } 
                     }
                 }
             }
@@ -292,24 +293,24 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 if (memberInfo is null)
                     throw new ArgumentException($"Invalid method call on provided expression");
 
-                string format = "\"{0}\".{1}";
+                string format = C.ColumnAccessFormat;
 
                 if (CheckIfMethodExists(methodName, aggregateFunctions))
                 {
-                    format = string.Format(aggregateFunctions[methodName], format) + (paramName is null ? "" : " AS \"" + paramName + "\"");
+                    format = string.Format(aggregateFunctions[methodName], format) + (paramName is null ? "" : " AS " + paramName);
                 }
 
                 var memberName = memberAttributes is null
-                    ? string.Format("\"{0}\"", memberInfo.Name.ToCaseFormat())
+                    ? memberInfo.Name.ToCaseFormat()
                     : memberAttributes.FirstOrDefault().ToString();
 
-                sb.AppendFormat(format + ",", type?.ToCaseFormat(), memberName);
+                sb.AppendFormat(format + ",", C.Scheme, type?.ToCaseFormat(), memberName);
             }
             else
             {
                 if (CheckIfMethodExists(methodName, aggregateFunctions))
                 {
-                    string format = aggregateFunctions[methodName] + (paramName is null ? "" : " AS \"" + paramName + "\"");
+                    string format = aggregateFunctions[methodName] + (paramName is null ? "" : " AS " + paramName);
                     sb.AppendFormat(format + ",", translatedInnerExpression);
                 }
             }
@@ -333,7 +334,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             var translator = new PostgreSqlConditionTranslator();
             string translatedBinary = translator.Translate(type!, bExp);
 
-            sb.AppendFormat((paramName is null ? "{0}," : "{0} AS \"{1}\","), translatedBinary, paramName);
+            sb.AppendFormat(paramName is null ? "{0}," : "{0} AS {1},", translatedBinary, paramName);
 
             return sb.ToString();
         }
@@ -401,7 +402,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         {
             if (m.Expression is not null && (m.Expression.NodeType == ExpressionType.Parameter || m.Expression.NodeType == ExpressionType.MemberAccess))
             {
-                sb.Append(string.Format("\"{0}\".\"{1}\"", type?.ToCaseFormat(), m.Member.Name.ToCaseFormat()));
+                sb.Append(string.Format(C.ColumnAccessFormat, C.Scheme, type?.ToCaseFormat(), m.Member.Name.ToCaseFormat()));
                 return m;
             }
 
@@ -450,7 +451,8 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 {
                     var mObj = m.Object as MemberExpression;
 
-                    sb.Append(string.Format(" \"{0}\".\"{1}\" LIKE '%{2}%' ",
+                    sb.Append(string.Format(" " + C.ColumnAccessFormat + " LIKE '%{3}%' ",
+                        C.Scheme,
                         mObj!.Expression!.Type.ToCaseFormat(),
                         mObj.Member.Name.ToCaseFormat(),
                         cArg.Value));
@@ -463,10 +465,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     expObj = m.Object;
                 }
                 else
-                {
-                    // TODO: Text for exception
-                    throw new ArgumentException("");
-                }
+                    throw new ArgumentException("Method argument is invalid");
 
             }
             else if (m.Arguments.Count == 2)
@@ -476,7 +475,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             }
 
             if (expObj is null)
-                throw new Exception("Object should not be null");
+                throw new ArgumentException("Object should not be null");
 
             bool isEnumerable = typeof(IEnumerable).IsAssignableFrom(expObj.Type);
             bool isArray = typeof(Array).IsAssignableFrom(expObj.Type);
@@ -514,7 +513,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                         localAction(init.Arguments[0], items);
                 }
 
-                sb.Append(string.Format(" \"{0}\".\"{1}\" IN ({2}) ", type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items)));
+                sb.Append(string.Format(" " + C.ColumnAccessFormat + " IN ({3}) ", C.Scheme, type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items)));
                 return sb.ToString();
             }
 
@@ -527,7 +526,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 object? val = obj.Value;
 
                 if (val is null)
-                    throw new Exception("Object value should not be null");
+                    throw new ArgumentException("Object value should not be null");
 
                 bool result = false;
                 result = PerformTypeBasedEnum<string>(genericArg, val, arg, result, sb);
@@ -560,11 +559,11 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         protected virtual string GetUpperLowerMethodTranslated(MethodCallExpression m, bool isLower)
         {
             if (m.Object is null)
-                throw new Exception("Object should not be null");
+                throw new ArgumentException("Object should not be null");
 
             if (m.Object is MemberExpression memberExp)
             {
-                return string.Format(" {0} (\"{1}\".\"{2}\")", isLower ? "LOWER" : "UPPER", type?.ToCaseFormat(), memberExp.Member.Name.ToCaseFormat());
+                return string.Format(" " + (isLower ? "LOWER" : "UPPER") + "(" + C.ColumnAccessFormat + ")", C.Scheme, type?.ToCaseFormat(), memberExp.Member.Name.ToCaseFormat());
             }
             else if (m.Object is ConstantExpression constExp)
             {
@@ -579,11 +578,11 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         protected virtual string GetToStringMethodTranslated(MethodCallExpression m)
         {
             if (m.Object is null)
-                throw new Exception("Object should not be null");
+                throw new ArgumentException("Object should not be null");
 
             if (m.Object is MemberExpression memberExp)
             {
-                return string.Format("\"{0}\".\"{1}\"::varchar(255)", type?.ToCaseFormat(), memberExp.Member.Name.ToCaseFormat());
+                return string.Format(C.ColumnAccessFormat + "::varchar(255)", C.Scheme, type?.ToCaseFormat(), memberExp.Member.Name.ToCaseFormat());
             }
             else if (m.Object is ConstantExpression constExp)
             {
@@ -598,13 +597,13 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (items is not null && items.Any())
             {
                 if (Constants.TypesToStringCast.Contains(typeof(TItem)))
-                    sb.Append(string.Format(" \"{0}\".\"{1}\" IN ({2}) ", type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items.Select(it => $"'{it}'"))));
+                    sb.Append(string.Format(" " + C.ColumnAccessFormat + " IN ({3}) ", C.Scheme, type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items.Select(it => $"'{it}'"))));
                 else
-                    sb.Append(string.Format(" \"{0}\".\"{1}\" IN ({2}) ", type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items)));
+                    sb.Append(string.Format(" " + C.ColumnAccessFormat + " IN ({3}) ", C.Scheme, type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items)));
             }
         }
 
-        protected string ConvertToItemWithType(object? item)
+        protected static string ConvertToItemWithType(object? item)
         {
             if (item is null)
                 return string.Empty;

@@ -9,6 +9,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using C = GiftyQueryLib.Config.QueryConfig;
 
 namespace GiftyQueryLib.Queries
 {
@@ -39,14 +40,14 @@ namespace GiftyQueryLib.Queries
         {
             string sql = "SELECT ";
             string sqlDistinct = distinct ? "DISTINCT " : string.Empty;
-            
+
             SelectorData parsedSelector = conditionTranslator.ParseAnonymousSelector(include, exclude);
 
             selectAllIsUsed = parsedSelector.ExtraData?.IsSelectAll;
             exceptRowSelector = exclude;
 
             string sqlRows = parsedSelector.Result! + (selectAllIsUsed ? "{0}" : "");
-            string sqlFrom = string.Format(" FROM \"{0}\" ", typeof(T).ToCaseFormat());
+            string sqlFrom = string.Format(" FROM {0}.{1} ", C.Scheme, typeof(T).ToCaseFormat());
 
             value = new StringBuilder(sql + sqlDistinct + sqlRows + sqlFrom);
 
@@ -81,9 +82,9 @@ namespace GiftyQueryLib.Queries
 
                         foreach (var attr in attributeData)
                         {
-                            if (GiftyQueryConfig.KeyAttributes.Any(type => attr.AttributeType == type)) keyAttrData = attr;
-                            if (GiftyQueryConfig.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
-                            if (GiftyQueryConfig.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
+                            if (C.KeyAttributes.Any(type => attr.AttributeType == type)) keyAttrData = attr;
+                            if (C.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
+                            if (C.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
                         }
 
                         if (keyAttrData is null && notMappedAttrData is null)
@@ -92,7 +93,7 @@ namespace GiftyQueryLib.Queries
                                 ? property.Name.ToCaseFormat()
                                 : foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat();
 
-                            nonNullableProps.Add(string.Format("\"{0}\"", propName));
+                            nonNullableProps.Add(string.Format("{0}", propName));
                         }
                     }
                 }
@@ -106,13 +107,13 @@ namespace GiftyQueryLib.Queries
                 foreach (var property in props)
                 {
                     var foreignKeyAttrData = property.GetCustomAttributesData()
-                        .FirstOrDefault(attr => GiftyQueryConfig.ForeignKeyAttributes.Any(type => attr.AttributeType == type));
+                        .FirstOrDefault(attr => C.ForeignKeyAttributes.Any(type => attr.AttributeType == type));
 
                     var propName = foreignKeyAttrData is null
                                ? property.Name.ToCaseFormat()
                                : foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat();
 
-                    propName = string.Format("\"{0}\"", propName);
+                    propName = string.Format("{0}", propName);
 
                     if (nonNullableProps.Contains(propName))
                     {
@@ -122,13 +123,10 @@ namespace GiftyQueryLib.Queries
                         {
                             var keyProp = property.PropertyType
                                 .GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true)
-                                    .FirstOrDefault(attr => GiftyQueryConfig.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
+                                    .FirstOrDefault(attr => C.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
 
                             if (keyProp is null)
-                            {
-                                // TODO: Text for exception
-                                throw new Exception("");
-                            }
+                                throw new ArgumentException($"The related table class {property.Name} does not contain key attribute");
 
                             var keyPropValue = property.GetValue(entity);
 
@@ -160,7 +158,7 @@ namespace GiftyQueryLib.Queries
             string columnsSql = string.Join(',', nonNullableProps);
             string rowsSql = string.Join(',', values);
 
-            value = new StringBuilder(string.Format("INSERT INTO \"{0}\" ({1}) VALUES {2}", typeof(T).ToCaseFormat(), columnsSql, rowsSql));
+            value = new StringBuilder(string.Format("INSERT INTO {0}.{1} ({2}) VALUES {3}", C.Scheme, typeof(T).ToCaseFormat(), columnsSql, rowsSql));
 
             return this;
         }
@@ -173,7 +171,7 @@ namespace GiftyQueryLib.Queries
 
         public virtual IEditConditionNode<T> Delete()
         {
-            value = new StringBuilder(string.Format("DELETE FROM \"{0}\" ", typeof(T).ToCaseFormat()));
+            value = new StringBuilder(string.Format("DELETE FROM {0}.{1} ", C.Scheme, typeof(T).ToCaseFormat()));
 
             return this;
         }
@@ -240,7 +238,7 @@ namespace GiftyQueryLib.Queries
             foreach (var (rowSelector, orderType) in rowsForOrdering)
             {
                 var data = conditionTranslator.GetMemberData(rowSelector);
-                string sqlOrderField = string.Format("\"{0}\".\"{1}\" ", data.CallerType!.ToCaseFormat(), data.MemberInfo?.Name.ToCaseFormat());
+                string sqlOrderField = string.Format(C.ColumnAccessFormat + " ", C.Scheme, data.CallerType!.ToCaseFormat(), data.MemberInfo?.Name.ToCaseFormat());
 
                 string sqlDirection = Enum.GetName(typeof(OrderType), (int)orderType)!;
 
@@ -279,43 +277,37 @@ namespace GiftyQueryLib.Queries
         private void ParseJoinExpression(MemberData selectorData, JoinType joinType)
         {
             var memberType = selectorData.MemberType;
-            var keyProp = memberType?
+            var keyProp = memberType
                 .GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true).FirstOrDefault(attr => attr is KeyAttribute) is not null);
 
             if (keyProp is null)
-            {
-                //TODO: Text for exception
-                throw new Exception("");
-            }
+                throw new ArgumentException($"Key attribute is absent in related table");
 
-            if (memberType!.IsValueType)
-            {
-                //TODO: Text for exception
-                throw new Exception("");
-            }
+            if (!memberType.IsClass)
+                throw new ArgumentException($"Unable to join using non-reference properties");
 
             string expresstionTypeName = selectorData.CallerType!.ToCaseFormat();
             string memberTypeName = memberType.Name.ToCaseFormat();
             string keyPropName = keyProp.Name.ToCaseFormat();
 
             var foreignKeyAttributeData = selectorData.MemberInfo?
-                .GetCustomAttributesData().FirstOrDefault(it => GiftyQueryConfig.ForeignKeyAttributes.Any(attr => it.AttributeType == attr));
+                .GetCustomAttributesData().FirstOrDefault(it => C.ForeignKeyAttributes.Any(attr => it.AttributeType == attr));
 
             string foreignKeyName = string.Empty;
 
             if (foreignKeyAttributeData is null)
             {
-                foreignKeyName = string.Format("\"{0}\".\"{1}\"", expresstionTypeName, memberTypeName + "_" + keyPropName);
+                foreignKeyName = string.Format(C.ColumnAccessFormat, C.Scheme, expresstionTypeName, memberTypeName + "_" + keyPropName);
             }
             else
             {
-                foreignKeyName = string.Format("\"{0}\".\"{1}\"", expresstionTypeName, foreignKeyAttributeData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat());
+                foreignKeyName = string.Format(C.ColumnAccessFormat, C.Scheme, expresstionTypeName, foreignKeyAttributeData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat());
             }
 
-            string inner = string.Format("\"{0}\".\"{1}\"", memberTypeName, keyPropName);
+            string inner = string.Format(C.ColumnAccessFormat, C.Scheme, memberTypeName, keyPropName);
             string sqlJoinType = joinType.ToString().ToUpper();
 
-            value.Append(string.Format("{0} JOIN \"{1}\" ON {2} = {3} ", sqlJoinType, memberTypeName, foreignKeyName, inner));
+            value.Append(string.Format("{0} JOIN {1}.{2} ON {3} = {4} ", sqlJoinType, C.Scheme, memberTypeName, foreignKeyName, inner));
 
             if (selectAllIsUsed)
             {

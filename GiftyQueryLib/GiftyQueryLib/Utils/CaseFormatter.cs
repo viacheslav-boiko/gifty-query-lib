@@ -17,13 +17,13 @@ namespace GiftyQueryLib.Utils
             if (text == null)
                 throw new ArgumentNullException(nameof(text));
 
-            var caseType = GiftyQueryConfig.CaseType;
+            var caseType = QueryConfig.CaseType;
 
             return caseType switch
             {
                 CaseType.Snake => ToSnakeCase(text),
                 CaseType.Camel => ToCamelCase(text),
-                CaseType.Custom => GiftyQueryConfig.CaseFormatterFunc.Invoke(text),
+                CaseType.Custom => QueryConfig.CaseFormatterFunc.Invoke(text),
                 _ => text,
             };
         }
