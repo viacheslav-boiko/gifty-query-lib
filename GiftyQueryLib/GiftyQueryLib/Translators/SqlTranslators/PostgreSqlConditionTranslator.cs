@@ -6,7 +6,6 @@ using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
-using C = GiftyQueryLib.Config.QueryConfig;
 
 namespace GiftyQueryLib.Translators.SqlTranslators
 {
@@ -15,8 +14,14 @@ namespace GiftyQueryLib.Translators.SqlTranslators
     /// </summary>
     public class PostgreSqlConditionTranslator : BaseConditionTranslator
     {
-        public PostgreSqlConditionTranslator() : base()
+        private readonly PostgreSqlConfig config;
+        private readonly CaseFormatterConfig caseConfig;
+
+        public PostgreSqlConditionTranslator(PostgreSqlConfig config) : base()
         {
+            this.config = config;
+            this.caseConfig = new CaseFormatterConfig { CaseType = config.CaseType, CaseFormatterFunc = config.CaseFormatterFunc };
+
             expressionTypes = new()
             {
                 { ExpressionType.Convert, new [] { string.Empty } },
@@ -76,7 +81,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 foreach (var exp in newExpression.Arguments)
                 {
-                    string? paramName = newExpression?.Members?[i]?.Name?.ToString()?.ToCaseFormat();
+                    string? paramName = newExpression?.Members?[i]?.Name?.ToString()?.ToCaseFormat(caseConfig);
 
                     if (exp is MemberExpression memberExp)
                         sb.Append(ParseMemberExpression(memberExp, paramName));
@@ -140,16 +145,16 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 foreach (var attr in attributeData)
                 {
-                    if (C.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
-                    if (C.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
+                    if (config.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
+                    if (config.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
                 }
 
                 if (notMappedAttrData is not null || (exceptSelector is not null && exceptMembers.Any(it => it.Name == property.Name)))
                     continue;
 
                 sb.Append(foreignKeyAttrData is not null
-                    ? string.Format(C.ColumnAccessFormat + ",", C.Scheme, type.ToCaseFormat(), foreignKeyAttrData.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat())
-                    : string.Format(C.ColumnAccessFormat + ",", C.Scheme, type.ToCaseFormat(), property.Name.ToCaseFormat()));
+                    ? string.Format(config.ColumnAccessFormat + ",", config.Scheme, type.ToCaseFormat(caseConfig), foreignKeyAttrData.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat(caseConfig))
+                    : string.Format(config.ColumnAccessFormat + ",", config.Scheme, type.ToCaseFormat(caseConfig), property.Name.ToCaseFormat(caseConfig)));
             }
 
             var parsed = sb.ToString();
@@ -166,17 +171,17 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         {
             var sb = new StringBuilder();
 
-            if (!C.NotMappedAttributes.Any(attr => memberExp.Member.GetCustomAttribute(attr) is not null))
+            if (!config.NotMappedAttributes.Any(attr => memberExp.Member.GetCustomAttribute(attr) is not null))
             {
-                var memberAttributes = GetMemberAttributeArguments(memberExp.Member);
+                var memberAttributes = GetMemberAttributeArguments(memberExp.Member, config.ForeignKeyAttributes);
                 var memberName = memberAttributes is null
-                    ? memberExp.Member.Name.ToCaseFormat()
+                    ? memberExp.Member.Name.ToCaseFormat(caseConfig)
                     : memberAttributes.FirstOrDefault().ToString();
 
                 if (memberName == paramName)
-                    sb.AppendFormat(C.ColumnAccessFormat + ",", C.Scheme, memberExp.Expression?.Type.ToCaseFormat(), memberName);
+                    sb.AppendFormat(config.ColumnAccessFormat + ",", config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName);
                 else
-                    sb.AppendFormat(C.ColumnAccessFormat + " AS {3},", C.Scheme, memberExp.Expression?.Type.ToCaseFormat(), memberName, paramName);
+                    sb.AppendFormat(config.ColumnAccessFormat + " AS {3},", config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName, paramName);
             }
 
             return sb.ToString();
@@ -207,7 +212,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 {
                     if (uExp is not null && uExp.Operand is BinaryExpression bExp)
                     {
-                        var translator = new PostgreSqlConditionTranslator();
+                        var translator = new PostgreSqlConditionTranslator(config);
                         translatedInnerExpression = translator.Translate(base.type!, bExp);
                     }
                     else
@@ -220,7 +225,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 }
                 else if (arguments[1] is BinaryExpression bExp)
                 {
-                    var translator = new PostgreSqlConditionTranslator();
+                    var translator = new PostgreSqlConditionTranslator(config);
                     translatedInnerExpression = translator.Translate(base.type!, bExp);
                 }
                 else if (arguments[1] is NewArrayExpression nExp)
@@ -238,17 +243,17 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                             {
                                 if (it is MemberExpression mExp)
                                 {
-                                    var fkArgument = GetMemberAttributeArguments(mExp?.Member)?.FirstOrDefault();
+                                    var fkArgument = GetMemberAttributeArguments(mExp?.Member, config.ForeignKeyAttributes)?.FirstOrDefault();
 
-                                    var memeberName = fkArgument?.Value is not null ? fkArgument.Value.ToString() : mExp?.Member.Name.ToCaseFormat();
-                                    return string.Format(C.ColumnAccessFormat, C.Scheme, mExp?.Expression?.Type.ToCaseFormat(), memeberName);
+                                    var memeberName = fkArgument?.Value is not null ? fkArgument.Value.ToString() : mExp?.Member.Name.ToCaseFormat(caseConfig);
+                                    return string.Format(config.ColumnAccessFormat, config.Scheme, mExp?.Expression?.Type.ToCaseFormat(caseConfig), memeberName);
                                 }
                                 else if (it is UnaryExpression uExp)
                                 {
                                     if (uExp is not null)
                                     {
                                         var operand = uExp.Operand;
-                                        var translator = new PostgreSqlConditionTranslator();
+                                        var translator = new PostgreSqlConditionTranslator(config);
                                         return translator.Translate(base.type!, operand);
                                     }
                                     else
@@ -286,14 +291,14 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 throw new ArgumentException($"Unsupported expression in provided arguments");
 
 
-            var memberAttributes = GetMemberAttributeArguments(memberInfo);
+            var memberAttributes = GetMemberAttributeArguments(memberInfo, config.ForeignKeyAttributes);
 
             if (translatedInnerExpression is null)
             {
                 if (memberInfo is null)
                     throw new ArgumentException($"Invalid method call on provided expression");
 
-                string format = C.ColumnAccessFormat;
+                string format = config.ColumnAccessFormat;
 
                 if (CheckIfMethodExists(methodName, aggregateFunctions))
                 {
@@ -301,10 +306,10 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 }
 
                 var memberName = memberAttributes is null
-                    ? memberInfo.Name.ToCaseFormat()
+                    ? memberInfo.Name.ToCaseFormat(caseConfig)
                     : memberAttributes.FirstOrDefault().ToString();
 
-                sb.AppendFormat(format + ",", C.Scheme, type?.ToCaseFormat(), memberName);
+                sb.AppendFormat(format + ",", config.Scheme, type?.ToCaseFormat(caseConfig), memberName);
             }
             else
             {
@@ -331,7 +336,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (Constants.TypesToStringCast.Contains(bExp.Type))
                 throw new ArgumentException($"Binary expression cannot be parsed when left or right operands have type {bExp.Type}. If you want concat strings use PConcat function instead.");
 
-            var translator = new PostgreSqlConditionTranslator();
+            var translator = new PostgreSqlConditionTranslator(config);
             string translatedBinary = translator.Translate(type!, bExp);
 
             sb.AppendFormat(paramName is null ? "{0}," : "{0} AS {1},", translatedBinary, paramName);
@@ -402,7 +407,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         {
             if (m.Expression is not null && (m.Expression.NodeType == ExpressionType.Parameter || m.Expression.NodeType == ExpressionType.MemberAccess))
             {
-                sb.Append(string.Format(C.ColumnAccessFormat, C.Scheme, type?.ToCaseFormat(), m.Member.Name.ToCaseFormat()));
+                sb.Append(string.Format(config.ColumnAccessFormat, config.Scheme, type?.ToCaseFormat(caseConfig), m.Member.Name.ToCaseFormat(caseConfig)));
                 return m;
             }
 
@@ -451,10 +456,10 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 {
                     var mObj = m.Object as MemberExpression;
 
-                    sb.Append(string.Format(" " + C.ColumnAccessFormat + " LIKE '%{3}%' ",
-                        C.Scheme,
-                        mObj!.Expression!.Type.ToCaseFormat(),
-                        mObj.Member.Name.ToCaseFormat(),
+                    sb.Append(string.Format(" " + config.ColumnAccessFormat + " LIKE '%{3}%' ",
+                        config.Scheme,
+                        mObj!.Expression!.Type.ToCaseFormat(caseConfig),
+                        mObj.Member.Name.ToCaseFormat(caseConfig),
                         cArg.Value));
 
                     return sb.ToString();
@@ -513,7 +518,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                         localAction(init.Arguments[0], items);
                 }
 
-                sb.Append(string.Format(" " + C.ColumnAccessFormat + " IN ({3}) ", C.Scheme, type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items)));
+                sb.Append(string.Format(" " + config.ColumnAccessFormat + " IN ({3}) ", config.Scheme, type?.ToCaseFormat(caseConfig), arg.ToCaseFormat(caseConfig), string.Join(',', items)));
                 return sb.ToString();
             }
 
@@ -563,7 +568,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
             if (m.Object is MemberExpression memberExp)
             {
-                return string.Format(" " + (isLower ? "LOWER" : "UPPER") + "(" + C.ColumnAccessFormat + ")", C.Scheme, type?.ToCaseFormat(), memberExp.Member.Name.ToCaseFormat());
+                return string.Format(" " + (isLower ? "LOWER" : "UPPER") + "(" + config.ColumnAccessFormat + ")", config.Scheme, type?.ToCaseFormat(caseConfig), memberExp.Member.Name.ToCaseFormat(caseConfig));
             }
             else if (m.Object is ConstantExpression constExp)
             {
@@ -582,7 +587,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
             if (m.Object is MemberExpression memberExp)
             {
-                return string.Format(C.ColumnAccessFormat + "::varchar(255)", C.Scheme, type?.ToCaseFormat(), memberExp.Member.Name.ToCaseFormat());
+                return string.Format(config.ColumnAccessFormat + "::varchar(255)", config.Scheme, type?.ToCaseFormat(caseConfig), memberExp.Member.Name.ToCaseFormat(caseConfig));
             }
             else if (m.Object is ConstantExpression constExp)
             {
@@ -597,9 +602,9 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (items is not null && items.Any())
             {
                 if (Constants.TypesToStringCast.Contains(typeof(TItem)))
-                    sb.Append(string.Format(" " + C.ColumnAccessFormat + " IN ({3}) ", C.Scheme, type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items.Select(it => $"'{it}'"))));
+                    sb.Append(string.Format(" " + config.ColumnAccessFormat + " IN ({3}) ", config.Scheme, type?.ToCaseFormat(caseConfig), arg.ToCaseFormat(caseConfig), string.Join(',', items.Select(it => $"'{it}'"))));
                 else
-                    sb.Append(string.Format(" " + C.ColumnAccessFormat + " IN ({3}) ", C.Scheme, type?.ToCaseFormat(), arg.ToCaseFormat(), string.Join(',', items)));
+                    sb.Append(string.Format(" " + config.ColumnAccessFormat + " IN ({3}) ", config.Scheme, type?.ToCaseFormat(caseConfig), arg.ToCaseFormat(caseConfig), string.Join(',', items)));
             }
         }
 

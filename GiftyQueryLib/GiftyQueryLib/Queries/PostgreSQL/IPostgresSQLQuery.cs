@@ -1,7 +1,7 @@
 ﻿using GiftyQueryLib.Enums;
 using System.Linq.Expressions;
 
-namespace GiftyQueryLib.Queries.QueryNodes
+namespace GiftyQueryLib.Queries.PostgreSQL
 {
     public interface IQueryStringBuilder
     {

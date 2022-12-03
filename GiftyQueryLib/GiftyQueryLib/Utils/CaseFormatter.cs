@@ -1,5 +1,4 @@
-﻿using GiftyQueryLib.Config;
-using GiftyQueryLib.Enums;
+﻿using GiftyQueryLib.Enums;
 using System.Text;
 
 namespace GiftyQueryLib.Utils
@@ -12,18 +11,18 @@ namespace GiftyQueryLib.Utils
         /// <param name="text">Source text</param>
         /// <returns>Formatted string in a specified case</returns>
         /// <exception cref="ArgumentNullException"></exception>
-        public static string ToCaseFormat(this string text)
+        public static string ToCaseFormat(this string text, CaseFormatterConfig config)
         {
             if (text == null)
                 throw new ArgumentNullException(nameof(text));
 
-            var caseType = QueryConfig.CaseType;
+            var caseType = config.CaseType;
 
             return caseType switch
             {
                 CaseType.Snake => ToSnakeCase(text),
                 CaseType.Camel => ToCamelCase(text),
-                CaseType.Custom => QueryConfig.CaseFormatterFunc.Invoke(text),
+                CaseType.Custom => config.CaseFormatterFunc.Invoke(text),
                 _ => text,
             };
         }
@@ -33,9 +32,9 @@ namespace GiftyQueryLib.Utils
         /// </summary>
         /// <param name="type">Source type</param>
         /// <returns>Formatted string in a specified case</returns>
-        public static string ToCaseFormat(this Type type)
+        public static string ToCaseFormat(this Type type, CaseFormatterConfig config)
         {
-            return ToCaseFormat(type.Name);
+            return ToCaseFormat(type.Name, config);
         }
 
         private static string ToCamelCase(string text)
@@ -82,5 +81,11 @@ namespace GiftyQueryLib.Utils
             }
             return sb.ToString();
         }
+    }
+
+    public class CaseFormatterConfig
+    {
+        public CaseType CaseType { get; set; }
+        public Func<string, string> CaseFormatterFunc { get; set; } = it => it;
     }
 }

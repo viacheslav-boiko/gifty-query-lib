@@ -1,5 +1,4 @@
-﻿using GiftyQueryLib.Config;
-using GiftyQueryLib.Translators.Models;
+﻿using GiftyQueryLib.Translators.Models;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -157,13 +156,13 @@ namespace GiftyQueryLib.Translators
         /// <param name="memberInfo">Member Info</param>
         /// <param name="attributeTypes">Attribute Types to retrieve arguments of them</param>
         /// <returns></returns>
-        protected IList<CustomAttributeTypedArgument>? GetMemberAttributeArguments(MemberInfo? memberInfo, HashSet<Type>? attributeTypes = null)
+        protected IList<CustomAttributeTypedArgument>? GetMemberAttributeArguments(MemberInfo? memberInfo, HashSet<Type> attributes, HashSet<Type>? attributeTypes = null)
         {
             if (memberInfo is null)
                 return null;
 
             var foreignKeyAttr = memberInfo.CustomAttributes
-                        .FirstOrDefault(attr => (attributeTypes is null ? QueryConfig.ForeignKeyAttributes : attributeTypes).Any(type => attr.AttributeType == type));
+                        .FirstOrDefault(attr => (attributeTypes is null ? attributes : attributeTypes).Any(type => attr.AttributeType == type));
 
             if (foreignKeyAttr is null)
                 return null;
