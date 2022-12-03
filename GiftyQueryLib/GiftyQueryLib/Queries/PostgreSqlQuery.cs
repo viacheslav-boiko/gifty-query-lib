@@ -14,9 +14,7 @@ using C = GiftyQueryLib.Config.QueryConfig;
 namespace GiftyQueryLib.Queries
 {
     public class PostgreSqlQuery<T> :
-        IInstructionNode<T>, IConditionNode<T>, IEditConditionNode<T>, IWhereNode<T>, IOrderNode<T>,
-        IKeySetPaginationNode<T>, ILimitNode, IJoinNode<T>,
-        IGroupNode<T> where T : class
+        IInstructionNode<T>, IEditConditionNode<T>, IConditionNode<T>, IJoinNode<T>, IWhereNode<T>, IGroupNode<T>, IHavingNode<T>, IOrderNode<T>, ILimitNode, IOffsetNode where T : class
     {
         protected StringBuilder value = new(string.Empty);
 
@@ -226,31 +224,7 @@ namespace GiftyQueryLib.Queries
             return this;
         }
 
-        public virtual IOrderNode<T> Order(params (Expression<Func<T, object>> rowSelector, OrderType orderType)[] rowsForOrdering)
-        {
-            if (rowsForOrdering is null || !rowsForOrdering.Any())
-                throw new ArgumentException("Method must accept at least one ordering pair");
-
-            string sqlOrder = "ORDER BY ";
-
-            var pairs = new List<string>();
-
-            foreach (var (rowSelector, orderType) in rowsForOrdering)
-            {
-                var data = conditionTranslator.GetMemberData(rowSelector);
-                string sqlOrderField = string.Format(C.ColumnAccessFormat + " ", C.Scheme, data.CallerType!.ToCaseFormat(), data.MemberInfo?.Name.ToCaseFormat());
-
-                string sqlDirection = Enum.GetName(typeof(OrderType), (int)orderType)!;
-
-                pairs.Add(sqlOrderField + sqlDirection);
-            }
-
-            value.Append(sqlOrder + string.Join(',', pairs) + " ");
-
-            return this;
-        }
-
-        public virtual ILimitNode Limit(int limit)
+        public virtual IOffsetNode Limit(int limit)
         {
             value.Append(string.Format("LIMIT {0} ", limit));
 
@@ -272,7 +246,6 @@ namespace GiftyQueryLib.Queries
 
             return str;
         }
-
 
         private void ParseJoinExpression(MemberData selectorData, JoinType joinType)
         {
@@ -314,6 +287,26 @@ namespace GiftyQueryLib.Queries
                 string sqlRows = "," + conditionTranslator.ParseAnonymousSelector(it => new { SelectType.All }, exceptRowSelector, memberType).Result! + "{0}";
                 value = new StringBuilder(string.Format(value.ToString(), sqlRows));
             }
+        }
+
+        public IHavingNode<T> Group(Expression<Func<T, object>> groupingObject)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IHavingNode<T> Group<U>(Expression<Func<U, object>> groupingObject) where U : class
+        {
+            throw new NotImplementedException();
+        }
+
+        public IOrderNode<T> Having(Expression<Func<T, bool>> condition)
+        {
+            throw new NotImplementedException();
+        }
+
+        public ILimitNode Order(params (Expression<Func<T, object>> rowSelector, OrderType orderType)[] rowsForOrdering)
+        {
+            throw new NotImplementedException();
         }
     }
 }

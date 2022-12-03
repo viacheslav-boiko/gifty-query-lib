@@ -8,30 +8,36 @@ namespace GiftyQueryLib.Queries.QueryNodes
         string Build();
     }
 
-    public interface ILimitNode : IQueryStringBuilder
+    public interface IOffsetNode : IQueryStringBuilder
     {
         IQueryStringBuilder Offset(int skipped);
     }
 
+    public interface ILimitNode : IQueryStringBuilder, IOffsetNode
+    {
+        IOffsetNode Limit(int limit);
+    }
+
     public interface IOrderNode<T> : IQueryStringBuilder, ILimitNode where T : class
     {
-        ILimitNode Limit(int limit);
+        ILimitNode Order(params (Expression<Func<T, object>> rowSelector, OrderType orderType)[] rowsForOrdering);
     }
 
-    public interface IKeySetPaginationNode<T> : IQueryStringBuilder, IOrderNode<T> where T : class
+    public interface IHavingNode<T> : IQueryStringBuilder, IOrderNode<T> where T : class
     {
-        IOrderNode<T> Order(params (Expression<Func<T, object>> rowSelector, OrderType orderType)[] rowsForOrdering);
+        IOrderNode<T> Having(Expression<Func<T, bool>> condition);
     }
 
-    public interface IGroupNode<T> : IKeySetPaginationNode<T>, IQueryStringBuilder where T : class
+    public interface IGroupNode<T> : IQueryStringBuilder, IHavingNode<T> where T : class
     {
+        IHavingNode<T> Group(Expression<Func<T, object>> groupingObject);
+
+        IHavingNode<T> Group<U>(Expression<Func<U, object>> groupingObject) where U : class;
     }
 
-    public interface IWhereNode<T> : IQueryStringBuilder, IKeySetPaginationNode<T> where T : class
+    public interface IWhereNode<T> : IQueryStringBuilder, IGroupNode<T> where T : class
     {
         IWhereNode<T> Where(Expression<Func<T, bool>> condition);
-        
-        // TODO: Keyset pagination
     }
 
     public interface IJoinNode<T> : IQueryStringBuilder, IWhereNode<T> where T : class
