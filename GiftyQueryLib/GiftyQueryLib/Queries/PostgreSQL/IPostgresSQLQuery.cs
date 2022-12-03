@@ -30,9 +30,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
     public interface IGroupNode<T> : IQueryStringBuilder, IHavingNode<T> where T : class
     {
-        IHavingNode<T> Group(Expression<Func<T, object>> groupingObject);
-
-        IHavingNode<T> Group<U>(Expression<Func<U, object>> groupingObject) where U : class;
+        IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null);
     }
 
     public interface IWhereNode<T> : IQueryStringBuilder, IGroupNode<T> where T : class

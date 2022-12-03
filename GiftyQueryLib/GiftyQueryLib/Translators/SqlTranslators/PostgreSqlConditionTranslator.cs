@@ -33,9 +33,18 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="anonymusSelector">The selector of anonymus type</param>
         /// <param name="exceptSelector">The selector to exclude params. Only works if anonymus selector has "All" claim</param>
         /// <param name="extraType">Extra Type</param>
+        /// <param name="useAliases">Determine if use aliases for columns or not</param>
         /// <returns>Member Data Collection</returns>
         /// <exception cref="BuilderException"></exception>
-        public override SelectorData ParseAnonymousSelector<TItem>(Expression<Func<TItem, object>>? anonymusSelector, Expression<Func<TItem, object>>? exceptSelector = null, Type? extraType = null) where TItem : class
+        public override SelectorData ParseAnonymousSelector<TItem>(
+            Expression<Func<TItem, object>>? anonymusSelector, 
+            Expression<Func<TItem, object>>? exceptSelector = null, 
+            Type? extraType = null,
+            bool allowMemberExpression = true,
+            bool allowMethodCallExpression = true,
+            bool allowBinaryExpression = true,
+            bool allowConstantExpression = true,
+            bool useAliases = true) where TItem : class
         {
             var body = anonymusSelector?.Body;
             var isSelectAll = false;
@@ -53,16 +62,33 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 foreach (var exp in newExpression.Arguments)
                 {
-                    string? paramName = newExpression?.Members?[i]?.Name?.ToString()?.ToCaseFormat(caseConfig);
+                    string? paramName = useAliases ? newExpression?.Members?[i]?.Name?.ToString()?.ToCaseFormat(caseConfig) : null;
 
                     if (exp is MemberExpression memberExp)
+                    {
+                        if (!allowMemberExpression)
+                            throw new BuilderException("Anonymous selector has not allowed expressions that cannot be parsed");
                         sb.Append(ParseMemberExpression(memberExp, paramName));
+                    }
+                       
                     else if (exp is MethodCallExpression callExp)
+                    {
+                        if (!allowMethodCallExpression)
+                            throw new BuilderException("Anonymous selector has not allowed expressions that cannot be parsed");
                         sb.Append(ParseMethodCallExpression(callExp, paramName));
+                    }
+                        
                     else if (exp is BinaryExpression bExp)
+                    {
+                        if (!allowBinaryExpression)
+                            throw new BuilderException("Anonymous selector has not allowed expressions that cannot be parsed");
                         sb.Append(ParseBinaryExpression(bExp, paramName));
+                    }
                     else if (exp is ConstantExpression cExp)
                     {
+                        if (!allowConstantExpression)
+                            throw new BuilderException("Anonymous selector has not allowed expressions that cannot be parsed");
+
                         if (cExp.Value?.ToString() == SelectType.All.ToString())
                         {
                             isSelectAll = true;
@@ -80,7 +106,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 return new SelectorData { Result = result, ExtraData = new { IsSelectAll = isSelectAll } };
             }
 
-            throw new BuilderException($"{nameof(ParseAnonymousSelector)} - Invalid expression was provided");
+            throw new BuilderException($"Invalid expression was provided");
         }
 
         /// <summary>
@@ -148,9 +174,9 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 var memberAttributes = GetMemberAttributeArguments(memberExp.Member, config.ForeignKeyAttributes);
                 var memberName = memberAttributes is null
                     ? memberExp.Member.Name.ToCaseFormat(caseConfig)
-                    : memberAttributes.FirstOrDefault().ToString();
+                    : memberAttributes.FirstOrDefault().ToString().Replace("\"", "");
 
-                if (memberName == paramName)
+                if (paramName is null || memberExp.Member.Name.ToCaseFormat(caseConfig) == paramName)
                     sb.AppendFormat(config.ColumnAccessFormat + ",", config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName);
                 else
                     sb.AppendFormat(config.ColumnAccessFormat + " AS {3},", config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName, paramName);

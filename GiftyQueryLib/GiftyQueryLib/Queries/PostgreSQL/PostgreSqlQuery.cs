@@ -284,7 +284,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             string inner = string.Format(config.ColumnAccessFormat, config.Scheme, memberTypeName, keyPropName);
             string sqlJoinType = joinType.ToString().ToUpper();
 
-            value.Append(string.Format("{0} JOIN {1}.{2} ON {3} = {4} ", sqlJoinType, config.Scheme, memberTypeName, foreignKeyName, inner));
+            value.AppendFormat("{0} JOIN {1}.{2} ON {3} = {4} ", sqlJoinType, config.Scheme, memberTypeName, foreignKeyName, inner);
 
             if (selectAllIsUsed)
             {
@@ -293,14 +293,12 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             }
         }
 
-        public IHavingNode<T> Group(Expression<Func<T, object>> groupingObject)
+        public IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null)
         {
-            throw new NotImplementedException();
-        }
+            var parsed = conditionTranslator.ParseAnonymousSelector(include, exclude, null, true, false, false, true, false);
+            value.AppendFormat("GROUP BY {0} ", parsed.Result);
 
-        public IHavingNode<T> Group<U>(Expression<Func<U, object>> groupingObject) where U : class
-        {
-            throw new NotImplementedException();
+            return this;
         }
 
         public IOrderNode<T> Having(Expression<Func<T, bool>> condition)

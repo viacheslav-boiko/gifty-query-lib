@@ -42,10 +42,18 @@ namespace GiftyQueryLib.Translators
         /// </summary>
         /// <param name="anonymusSelector">The selector of anonymus type</param>
         /// <param name="exceptSelector">The selector to exclude params. Only works if anonymus selector has "All" claim</param>
-        /// <param name="extraType">Extra type</param>
+        /// <param name="extraType">Extra Type</param>
+        /// <param name="useAliases">Determine if use aliases for columns or not</param>
         /// <returns>Member Data Collection</returns>
-        /// <exception cref="ArgumentException"></exception>
-        public abstract SelectorData ParseAnonymousSelector<TItem>(Expression<Func<TItem, object>>? anonymusSelector, Expression<Func<TItem, object>>? exceptSelector = null, Type? extraType = null) where TItem : class;
+        public abstract SelectorData ParseAnonymousSelector<TItem>(
+            Expression<Func<TItem, object>>? anonymusSelector, 
+            Expression<Func<TItem, object>>? exceptSelector = null, 
+            Type? extraType = null,
+             bool allowMemberExpression = true,
+            bool allowMethodCallExpression = true,
+            bool allowBinaryExpression = true,
+            bool allowConstantExpression = true,
+            bool useAliases = true) where TItem : class;
 
         /// <summary>
         /// Converts an Expression statement into other language statement string
