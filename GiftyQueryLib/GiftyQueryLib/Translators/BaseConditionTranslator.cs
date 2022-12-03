@@ -21,16 +21,6 @@ namespace GiftyQueryLib.Translators
         protected StringBuilder sb;
 
         /// <summary>
-        /// Possible expression types and them analogs
-        /// </summary>
-        protected Dictionary<ExpressionType, string[]> expressionTypes;
-
-        /// <summary>
-        /// Aggregate functions and them analogs
-        /// </summary>
-        protected Dictionary<string, string> aggregateFunctions;
-
-        /// <summary>
         /// Aliases to bind already used logic to them
         /// </summary>
         protected Dictionary<string, string> aliases;
@@ -44,8 +34,6 @@ namespace GiftyQueryLib.Translators
             sb = new StringBuilder();
 
             type = null;
-            expressionTypes = new();
-            aggregateFunctions = new();
             aliases = new();
         }
 

@@ -1,4 +1,5 @@
 ﻿using GiftyQueryLib.Config;
+using GiftyQueryLib.Functions;
 using GiftyQueryLib.Queries.PostgreSQL;
 using System.Linq.Expressions;
 
@@ -34,6 +35,11 @@ namespace GiftyQueryLib.Builders
         /// </summary>
         /// <typeparam name="T"></typeparam>
         public IEditConditionNode<T> Delete<T>() where T : class;
+
+        /// <summary>
+        /// PostgreSQL Functions
+        /// </summary>
+        public PostgreSqlFunctions Func { get; }
     }
 
     public class PostgreSqlBuilder : IPostgreSqlBuilder
@@ -44,6 +50,11 @@ namespace GiftyQueryLib.Builders
         /// PostgreSQL Configuration
         /// </summary>
         public PostgreSqlConfig Config { get; init; } = new();
+
+        /// <summary>
+        /// PostgreSQL Functions
+        /// </summary>
+        public PostgreSqlFunctions Func => new();
 
         #endregion
 
@@ -59,7 +70,7 @@ namespace GiftyQueryLib.Builders
         /// <param name="distinct">Is selection distinct</param>
         public virtual IConditionNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config).Select(include, exclude, distinct);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Select(include, exclude, distinct);
         }
 
         /// <summary>
@@ -69,7 +80,7 @@ namespace GiftyQueryLib.Builders
         /// <param name="entities">Entities to insert</param>
         public virtual IQueryStringBuilder Insert<T>(params T[] entities) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config).Insert(entities);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Insert(entities);
         }
 
         /// <summary>
@@ -79,7 +90,7 @@ namespace GiftyQueryLib.Builders
         /// <param name="entities">Entities to update</param>
         public virtual IEditConditionNode<T> Update<T>(params T[] entities) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config).Update(entities);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Update(entities);
         }
 
         /// <summary>
@@ -88,7 +99,7 @@ namespace GiftyQueryLib.Builders
         /// <typeparam name="T"></typeparam>
         public virtual IEditConditionNode<T> Delete<T>() where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config).Delete();
+            return PostgreSqlQuery<T>.Flow(Config, Func).Delete();
         }
 
         #endregion

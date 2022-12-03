@@ -1,5 +1,7 @@
 ﻿using GiftyQueryLib.Config;
 using GiftyQueryLib.Enums;
+using GiftyQueryLib.Exceptions;
+using GiftyQueryLib.Functions;
 using GiftyQueryLib.Translators.Models;
 using GiftyQueryLib.Utils;
 using System.Collections;
@@ -16,43 +18,13 @@ namespace GiftyQueryLib.Translators.SqlTranslators
     {
         private readonly PostgreSqlConfig config;
         private readonly CaseFormatterConfig caseConfig;
+        private readonly PostgreSqlFunctions func;
 
-        public PostgreSqlConditionTranslator(PostgreSqlConfig config) : base()
+        public PostgreSqlConditionTranslator(PostgreSqlConfig config, PostgreSqlFunctions func) : base()
         {
             this.config = config;
             this.caseConfig = new CaseFormatterConfig { CaseType = config.CaseType, CaseFormatterFunc = config.CaseFormatterFunc };
-
-            expressionTypes = new()
-            {
-                { ExpressionType.Convert, new [] { string.Empty } },
-                { ExpressionType.Not, new [] { " NOT " } },
-                { ExpressionType.And, new [] { " AND " } },
-                { ExpressionType.AndAlso, new [] { " AND " } },
-                { ExpressionType.Or, new [] { " OR " } },
-                { ExpressionType.OrElse, new [] { " OR " } },
-                { ExpressionType.Equal, new[] { " IS ", " = " } },
-                { ExpressionType.NotEqual, new[] { " IS NOT ", " != " } },
-                { ExpressionType.LessThan, new[] { " < " } },
-                { ExpressionType.LessThanOrEqual, new[] { " <= " } },
-                { ExpressionType.GreaterThan, new[] { " > " } },
-                { ExpressionType.GreaterThanOrEqual, new[] { " >= " } },
-                { ExpressionType.Add, new[] { " + " } },
-                { ExpressionType.Subtract, new[] { " - " } },
-                { ExpressionType.Multiply, new[] { " * " } },
-                { ExpressionType.Divide, new[] { " / " } },
-                { ExpressionType.Modulo, new[] { " % " } },
-                { ExpressionType.ExclusiveOr, new[] { " ^ " } }
-            };
-
-            aggregateFunctions = new Dictionary<string, string>
-            {
-                { "PCount", "COUNT({0})" },
-                { "PSum", "SUM({0})" },
-                { "PAvg", "AVG({0})" },
-                { "PMin", "MIN({0})" },
-                { "PMax", "MAX({0})" },
-                { "PConcat", "CONCAT({0})" }
-            };
+            this.func = func;
         }
 
         /// <summary>
@@ -62,14 +34,14 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="exceptSelector">The selector to exclude params. Only works if anonymus selector has "All" claim</param>
         /// <param name="extraType">Extra Type</param>
         /// <returns>Member Data Collection</returns>
-        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="BuilderException"></exception>
         public override SelectorData ParseAnonymousSelector<TItem>(Expression<Func<TItem, object>>? anonymusSelector, Expression<Func<TItem, object>>? exceptSelector = null, Type? extraType = null) where TItem : class
         {
             var body = anonymusSelector?.Body;
             var isSelectAll = false;
 
             if (body is null)
-                throw new ArgumentException($"The anonymus selector is null");
+                throw new BuilderException($"The anonymus selector is null");
 
             if (body is NewExpression newExpression && newExpression.Type.Name.Contains("Anonymous"))
             {
@@ -108,7 +80,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 return new SelectorData { Result = result, ExtraData = new { IsSelectAll = isSelectAll } };
             }
 
-            throw new ArgumentException($"{nameof(ParseAnonymousSelector)} - Invalid expression was provided");
+            throw new BuilderException($"{nameof(ParseAnonymousSelector)} - Invalid expression was provided");
         }
 
         /// <summary>
@@ -193,7 +165,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="callExp"></param>
         /// <param name="paramName"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="BuilderException"></exception>
         protected virtual string ParseMethodCallExpression(MethodCallExpression callExp, string? paramName = null)
         {
             var sb = new StringBuilder();
@@ -208,75 +180,35 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
             if (arguments.Count == 2)
             {
-                if (arguments[1] is UnaryExpression uExp)
-                {
-                    if (uExp is not null && uExp.Operand is BinaryExpression bExp)
-                    {
-                        var translator = new PostgreSqlConditionTranslator(config);
-                        translatedInnerExpression = translator.Translate(base.type!, bExp);
-                    }
-                    else
-                        throw new ArgumentException($"The parameter of function/method is invalid in anonymous expression");
-                }
-                else if (arguments[1] is MemberExpression mExp)
+                if (arguments[1] is MemberExpression mExp)
                 {
                     type = mExp.Expression?.Type;
                     memberInfo = mExp.Member;
                 }
                 else if (arguments[1] is BinaryExpression bExp)
                 {
-                    var translator = new PostgreSqlConditionTranslator(config);
+                    var translator = new PostgreSqlConditionTranslator(config, func);
                     translatedInnerExpression = translator.Translate(base.type!, bExp);
                 }
-                else if (arguments[1] is NewArrayExpression nExp)
-                {
-                    if (CheckIfMethodExists(methodName, aggregateFunctions))
-                    {
-                        if (methodName == "PConcat")
-                        {
-                            if (nExp.Expressions.Count < 2)
-                            {
-                                throw new ArgumentException($"Cannot use CONCAT function with 1 or less number of arguments");
-                            }
-
-                            var columns = nExp.Expressions.Select(it =>
-                            {
-                                if (it is MemberExpression mExp)
-                                {
-                                    var fkArgument = GetMemberAttributeArguments(mExp?.Member, config.ForeignKeyAttributes)?.FirstOrDefault();
-
-                                    var memeberName = fkArgument?.Value is not null ? fkArgument.Value.ToString() : mExp?.Member.Name.ToCaseFormat(caseConfig);
-                                    return string.Format(config.ColumnAccessFormat, config.Scheme, mExp?.Expression?.Type.ToCaseFormat(caseConfig), memeberName);
-                                }
-                                else if (it is UnaryExpression uExp)
-                                {
-                                    if (uExp is not null)
-                                    {
-                                        var operand = uExp.Operand;
-                                        var translator = new PostgreSqlConditionTranslator(config);
-                                        return translator.Translate(base.type!, operand);
-                                    }
-                                    else
-                                        throw new ArgumentException($"The parameter of function/method is invalid in anonymous expression");
-                                }
-                                else
-                                    throw new ArgumentException($"The parameter of function/method is invalid in anonymous expression");
-
-                            });
-
-                            return string.Format(aggregateFunctions[methodName], string.Join(',', columns)) + (paramName is null ? "" : " AS " + paramName);
-                        } 
-                    }
-                }
+                else
+                    throw new BuilderException($"The parameter of function/method is invalid in anonymous expression");
             }
 
             if (arguments[0] is UnaryExpression uArg)
             {
-                if (uArg.Operand is not MemberExpression operand)
-                    throw new ArgumentException($"The operand of the unary expression is null");
+                if (uArg is not null && uArg.Operand is MemberExpression operand)
+                {
+                    type = operand.Expression?.Type;
+                    memberInfo = operand.Member;
+                }
+                else if (uArg is not null && uArg.Operand is BinaryExpression bExp)
+                {
+                    var translator = new PostgreSqlConditionTranslator(config, func);
+                    translatedInnerExpression = translator.Translate(base.type!, bExp);
+                }
+                else
+                    throw new BuilderException($"The parameter of function/method is invalid in anonymous expression");
 
-                type = operand.Expression?.Type;
-                memberInfo = operand.Member;
             }
             else if (arguments[0] is MemberExpression mArg)
             {
@@ -287,8 +219,46 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             {
                 type = pArg.Type;
             }
+            else if (arguments[0] is NewArrayExpression nExp)
+            {
+                if (CheckIfMethodExists(methodName, func.Functions!))
+                {
+                    if (methodName == nameof(func.Concat))
+                    {
+                        if (nExp.Expressions.Count < 2)
+                            throw new BuilderException($"Cannot use CONCAT function with 1 or less number of arguments");
+
+                        var columns = nExp.Expressions.Select(it =>
+                        {
+                            if (it is MemberExpression mExp)
+                            {
+                                var fkArgument = GetMemberAttributeArguments(mExp?.Member, config.ForeignKeyAttributes)?.FirstOrDefault();
+
+                                var memeberName = fkArgument?.Value is not null ? fkArgument.Value.ToString() : mExp?.Member.Name.ToCaseFormat(caseConfig);
+                                return string.Format(config.ColumnAccessFormat, config.Scheme, mExp?.Expression?.Type.ToCaseFormat(caseConfig), memeberName);
+                            }
+                            else if (it is UnaryExpression uExp && uExp is not null)
+                            {
+                                var operand = uExp.Operand;
+                                var translator = new PostgreSqlConditionTranslator(config, func);
+                                return translator.Translate(base.type!, operand);
+                            }
+                            else if (it is MethodCallExpression mcExp && mcExp is not null)
+                            {
+                                var translator = new PostgreSqlConditionTranslator(config, func);
+                                return translator.Translate(base.type!, mcExp);
+                            }
+                            else
+                                throw new BuilderException($"The parameter of function/method is invalid in anonymous expression");
+
+                        });
+
+                        return string.Format(func.Functions[methodName].value, string.Join(',', columns)) + (paramName is null ? "" : " AS " + paramName);
+                    }
+                }
+            }
             else
-                throw new ArgumentException($"Unsupported expression in provided arguments");
+                throw new BuilderException($"Unsupported expression in provided arguments");
 
 
             var memberAttributes = GetMemberAttributeArguments(memberInfo, config.ForeignKeyAttributes);
@@ -296,13 +266,16 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (translatedInnerExpression is null)
             {
                 if (memberInfo is null)
-                    throw new ArgumentException($"Invalid method call on provided expression");
+                    throw new BuilderException($"Invalid method call on provided expression");
 
                 string format = config.ColumnAccessFormat;
 
-                if (CheckIfMethodExists(methodName, aggregateFunctions))
+                if (CheckIfMethodExists(methodName, func.Functions!))
                 {
-                    format = string.Format(aggregateFunctions[methodName], format) + (paramName is null ? "" : " AS " + paramName);
+                    if (!func.CheckFunctionAllowedTypes((memberInfo as PropertyInfo)!.PropertyType, methodName))
+                        throw new BuilderException($"Type \"{(memberInfo as PropertyInfo)!.PropertyType.Name}\" should not be used in method \"{methodName}\"");
+
+                    format = string.Format(func.Functions[methodName].value, format) + (paramName is null ? "" : " AS " + paramName);
                 }
 
                 var memberName = memberAttributes is null
@@ -313,9 +286,9 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             }
             else
             {
-                if (CheckIfMethodExists(methodName, aggregateFunctions))
+                if (CheckIfMethodExists(methodName, func.Functions!))
                 {
-                    string format = aggregateFunctions[methodName] + (paramName is null ? "" : " AS " + paramName);
+                    string format = func.Functions[methodName].value + (paramName is null ? "" : " AS " + paramName);
                     sb.AppendFormat(format + ",", translatedInnerExpression);
                 }
             }
@@ -334,9 +307,9 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             var sb = new StringBuilder();
 
             if (Constants.TypesToStringCast.Contains(bExp.Type))
-                throw new ArgumentException($"Binary expression cannot be parsed when left or right operands have type {bExp.Type}. If you want concat strings use PConcat function instead.");
+                throw new BuilderException($"Binary expression cannot be parsed when left or right operands have type {bExp.Type}. If you want concat strings use PConcat function instead.");
 
-            var translator = new PostgreSqlConditionTranslator(config);
+            var translator = new PostgreSqlConditionTranslator(config, func);
             string translatedBinary = translator.Translate(type!, bExp);
 
             sb.AppendFormat(paramName is null ? "{0}," : "{0} AS {1},", translatedBinary, paramName);
@@ -350,18 +323,18 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="methodName"></param>
         /// <param name="functions"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        protected virtual bool CheckIfMethodExists(string? methodName, Dictionary<string, string> functions) =>
+        /// <exception cref="BuilderException"></exception>
+        protected virtual bool CheckIfMethodExists(string? methodName, Dictionary<string, (string value, HashSet<Type> allowedTypes)> functions) =>
             methodName is not null && functions.ContainsKey(methodName)
             ? true
-            : throw new ArgumentException($"Funtion '{methodName}' is not registered into dictionary {nameof(aggregateFunctions)}");
+            : throw new BuilderException($"Funtion '{methodName}' is not registered into dictionary {nameof(func.Functions)}");
 
 
         protected override Expression VisitUnary(UnaryExpression u)
         {
             try
             {
-                string value = expressionTypes[u.NodeType][0];
+                string value = func.ExpressionTypes[u.NodeType][0];
                 if (!string.IsNullOrEmpty(value))
                     sb.Append(value);
                 Visit(u.Operand);
@@ -377,13 +350,13 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         {
             try
             {
-                if (!expressionTypes.ContainsKey(b.NodeType))
+                if (!func.ExpressionTypes.ContainsKey(b.NodeType))
                     throw new NotSupportedException(string.Format("The binary operator '{0}' is not supported", b.NodeType));
 
                 sb.Append('(');
                 Visit(b.Left);
 
-                string[] values = expressionTypes[b.NodeType];
+                string[] values = func.ExpressionTypes[b.NodeType];
                 sb.Append(values.Length > 1 ? values[IsNullConstant(b.Right) ? 0 : 1] : values[0]);
 
                 Visit(b.Right);
@@ -416,7 +389,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
         protected override Expression VisitMethodCall(MethodCallExpression m)
         {
-            if (aggregateFunctions.ContainsKey(m.Method.Name))
+            if (func.Functions.ContainsKey(m.Method.Name))
             {
                 string parsed = ParseMethodCallExpression(m);
 
@@ -470,7 +443,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     expObj = m.Object;
                 }
                 else
-                    throw new ArgumentException("Method argument is invalid");
+                    throw new BuilderException("Method argument is invalid");
 
             }
             else if (m.Arguments.Count == 2)
@@ -480,7 +453,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             }
 
             if (expObj is null)
-                throw new ArgumentException("Object should not be null");
+                throw new BuilderException("Object should not be null");
 
             bool isEnumerable = typeof(IEnumerable).IsAssignableFrom(expObj.Type);
             bool isArray = typeof(Array).IsAssignableFrom(expObj.Type);
@@ -494,7 +467,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     else if (exp is MethodCallExpression mExp)
                         items.Add(GetMethodTranslated(mExp));
                     else
-                        throw new ArgumentException("Invalid data");
+                        throw new BuilderException("Invalid data");
                 }
 
                 var items = new List<object>();
@@ -531,7 +504,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 object? val = obj.Value;
 
                 if (val is null)
-                    throw new ArgumentException("Object value should not be null");
+                    throw new BuilderException("Object value should not be null");
 
                 bool result = false;
                 result = PerformTypeBasedEnum<string>(genericArg, val, arg, result, sb);
@@ -551,20 +524,20 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 result = PerformTypeBasedEnum<decimal>(genericArg, val, arg, result, sb);
 
                 if (!result)
-                    throw new ArgumentException($"Unsupported type {genericArg?.Name}");
+                    throw new BuilderException($"Unsupported type {genericArg?.Name}");
 
                 return sb.ToString();
             }
             else
             {
-                throw new ArgumentException($"Unsupported type {obj.Type}");
+                throw new BuilderException($"Unsupported type {obj.Type}");
             }
         }
 
         protected virtual string GetUpperLowerMethodTranslated(MethodCallExpression m, bool isLower)
         {
             if (m.Object is null)
-                throw new ArgumentException("Object should not be null");
+                throw new BuilderException("Object should not be null");
 
             if (m.Object is MemberExpression memberExp)
             {
@@ -583,7 +556,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         protected virtual string GetToStringMethodTranslated(MethodCallExpression m)
         {
             if (m.Object is null)
-                throw new ArgumentException("Object should not be null");
+                throw new BuilderException("Object should not be null");
 
             if (m.Object is MemberExpression memberExp)
             {

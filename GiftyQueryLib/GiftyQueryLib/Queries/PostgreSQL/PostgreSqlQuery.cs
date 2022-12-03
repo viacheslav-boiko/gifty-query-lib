@@ -1,6 +1,7 @@
-﻿using GiftyQueryLib.Builders;
-using GiftyQueryLib.Config;
+﻿using GiftyQueryLib.Config;
 using GiftyQueryLib.Enums;
+using GiftyQueryLib.Exceptions;
+using GiftyQueryLib.Functions;
 using GiftyQueryLib.Translators;
 using GiftyQueryLib.Translators.Models;
 using GiftyQueryLib.Translators.SqlTranslators;
@@ -32,9 +33,9 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             this.caseConfig = new CaseFormatterConfig { CaseType = config.CaseType, CaseFormatterFunc = config.CaseFormatterFunc };
         }
 
-        public static IInstructionNode<T> Flow(PostgreSqlConfig config)
+        public static IInstructionNode<T> Flow(PostgreSqlConfig config, PostgreSqlFunctions func)
         {
-            return new PostgreSqlQuery<T>(new PostgreSqlConditionTranslator(config), config);
+            return new PostgreSqlQuery<T>(new PostgreSqlConditionTranslator(config, func), config);
         }
 
         public virtual IConditionNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false)
@@ -59,7 +60,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         {
             if (entities is null || entities.Length == 0)
             {
-                throw new ArgumentException("At least one parameter should be provided");
+                throw new BuilderException("At least one parameter should be provided");
             }
 
             var values = new List<string>();
@@ -127,7 +128,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                                     .FirstOrDefault(attr => config.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
 
                             if (keyProp is null)
-                                throw new ArgumentException($"The related table class {property.Name} does not contain key attribute");
+                                throw new BuilderException($"The related table class {property.Name} does not contain key attribute");
 
                             var keyPropValue = property.GetValue(entity);
 
@@ -257,10 +258,10 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                 .GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true).FirstOrDefault(attr => attr is KeyAttribute) is not null);
 
             if (keyProp is null)
-                throw new ArgumentException($"Key attribute is absent in related table");
+                throw new BuilderException($"Key attribute is absent in related table");
 
             if (memberType == null || !memberType.IsClass)
-                throw new ArgumentException($"Unable to join using non-reference properties");
+                throw new BuilderException($"Unable to join using non-reference properties");
 
             string expresstionTypeName = selectorData.CallerType!.ToCaseFormat(caseConfig);
             string memberTypeName = memberType.Name.ToCaseFormat(caseConfig);
