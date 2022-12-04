@@ -2,7 +2,6 @@
 using GiftyQueryLib.Enums;
 using GiftyQueryLib.Exceptions;
 using GiftyQueryLib.Functions;
-using GiftyQueryLib.Translators;
 using GiftyQueryLib.Translators.Models;
 using GiftyQueryLib.Translators.SqlTranslators;
 using GiftyQueryLib.Utils;
@@ -14,7 +13,7 @@ using System.Text;
 namespace GiftyQueryLib.Queries.PostgreSQL
 {
     public class PostgreSqlQuery<T> :
-        IInstructionNode<T>, IEditConditionNode<T>, IConditionNode<T>, IJoinNode<T>, IWhereNode<T>, IGroupNode<T>, IHavingNode<T>, IOrderNode<T>, ILimitNode, IOffsetNode where T : class
+       IInstructionNode<T>, IEditConditionNode<T>, IConditionNode<T>, IJoinNode<T>, IWhereNode<T>, IGroupNode<T>, IHavingNode<T>, IOrderNode<T>, ILimitNode, IOffsetNode where T : class
     {
         protected StringBuilder value = new(string.Empty);
 

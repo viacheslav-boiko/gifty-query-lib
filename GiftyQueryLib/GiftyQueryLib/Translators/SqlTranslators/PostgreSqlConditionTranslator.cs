@@ -19,9 +19,11 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         private readonly PostgreSqlConfig config;
         private readonly CaseFormatterConfig caseConfig;
         private readonly PostgreSqlFunctions func;
+        private readonly Dictionary<string, string> aliases;
 
         public PostgreSqlConditionTranslator(PostgreSqlConfig config, PostgreSqlFunctions func) : base()
         {
+            this.aliases = new();
             this.config = config;
             this.caseConfig = new CaseFormatterConfig { CaseType = config.CaseType, CaseFormatterFunc = config.CaseFormatterFunc };
             this.func = func;
@@ -37,8 +39,8 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <returns>Member Data Collection</returns>
         /// <exception cref="BuilderException"></exception>
         public override SelectorData ParseAnonymousSelector<TItem>(
-            Expression<Func<TItem, object>>? anonymusSelector, 
-            Expression<Func<TItem, object>>? exceptSelector = null, 
+            Expression<Func<TItem, object>>? anonymusSelector,
+            Expression<Func<TItem, object>>? exceptSelector = null,
             Type? extraType = null,
             bool allowMemberExpression = true,
             bool allowMethodCallExpression = true,
@@ -70,14 +72,14 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                             throw new BuilderException("Anonymous selector has not allowed expressions that cannot be parsed");
                         sb.Append(ParseMemberExpression(memberExp, paramName));
                     }
-                       
+
                     else if (exp is MethodCallExpression callExp)
                     {
                         if (!allowMethodCallExpression)
                             throw new BuilderException("Anonymous selector has not allowed expressions that cannot be parsed");
                         sb.Append(ParseMethodCallExpression(callExp, paramName, true));
                     }
-                        
+
                     else if (exp is BinaryExpression bExp)
                     {
                         if (!allowBinaryExpression)
@@ -166,7 +168,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="paramName"></param>
         /// <returns></returns>
         protected virtual string ParseMemberExpression(MemberExpression memberExp, string? paramName = null)
-        { 
+        {
             if (!config.NotMappedAttributes.Any(attr => memberExp.Member.GetCustomAttribute(attr) is not null))
             {
                 var memberAttributes = GetMemberAttributeArguments(memberExp.Member, config.ForeignKeyAttributes);
@@ -182,9 +184,9 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 {
                     if (!aliases.TryAdd(paramName, result))
                         throw new BuilderException($"Alias \"{paramName}\" already exists");
-                    
+
                     return string.Format(result + " AS {0},", paramName);
-                }      
+                }
             }
 
             return string.Empty;
@@ -254,7 +256,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             {
                 if (CheckIfMethodExists(methodName, func.Functions!))
                 {
-                    if (methodName == nameof(func.Concat))
+                    if (methodName == "Concat")
                     {
                         if (nExp.Expressions.Count < 2)
                             throw new BuilderException($"Cannot use CONCAT function with 1 or less number of arguments");
@@ -288,7 +290,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                         if (paramName is null)
                             return result + ",";
-                        
+
                         if (!aliases.TryAdd(paramName, result))
                             throw new BuilderException($"Alias \"{paramName}\" already exists");
 
@@ -298,7 +300,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             }
             else if (arguments[0] is ConstantExpression cEx)
             {
-                if (methodName == nameof(func.Alias))
+                if (methodName == "Alias")
                 {
                     var alias = cEx?.Value?.ToString()?.ToCaseFormat(caseConfig);
                     if (alias is null)
@@ -311,7 +313,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                     if (value is null && string.IsNullOrEmpty(value))
                         throw new BuilderException($"Alias with name \"{alias}\" cannot have an empty value");
-                    
+
                     return isSelectorParsing ? alias : value;
                 }
             }
@@ -348,7 +350,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 {
                     if (!aliases.TryAdd(paramName, result))
                         throw new BuilderException($"Alias \"{paramName}\" already exists");
-                    
+
                     sb.Append(result + $" AS {paramName},");
                 }
             }
@@ -492,7 +494,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             {
                 if (m.Arguments[0] is ConstantExpression cArg)
                 {
-                    if (m.Object is MethodCallExpression mcExp && mcExp.Method.Name == nameof(func.Alias))
+                    if (m.Object is MethodCallExpression mcExp && mcExp.Method.Name == "Alias")
                     {
                         sb.AppendFormat(" {0} LIKE '%{1}%' ", ParseMethodCallExpression(mcExp, isSelectorParsing: true), cArg.Value);
                     }

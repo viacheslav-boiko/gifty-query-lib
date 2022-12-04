@@ -8,6 +8,14 @@ namespace GiftyQueryLib.Builders
     public interface IPostgreSqlBuilder
     {
         /// <summary>
+        /// Set up custom configuration for PostgreSQL builder
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="config">PostgreSQL Configuration</param>
+        /// <returns></returns>
+        public IInstructionNode<T> UseConfig<T>(PostgreSqlConfig config) where T : class;
+
+        /// <summary>
         /// PostgreSQL Select Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -54,12 +62,23 @@ namespace GiftyQueryLib.Builders
         /// <summary>
         /// PostgreSQL Functions
         /// </summary>
-        public PostgreSqlFunctions Func => new();
+        public PostgreSqlFunctions Func => PostgreSqlFunctions.Instance;
 
         #endregion
 
 
         #region Queries
+
+        /// <summary>
+        /// Set up custom configuration for PostgreSQL builder
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="config">PostgreSQL Configuration</param>
+        /// <returns></returns>
+        public IInstructionNode<T> UseConfig<T>(PostgreSqlConfig config) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(config, Func);
+        }
 
         /// <summary>
         /// PostgreSQL Select Query
@@ -101,6 +120,54 @@ namespace GiftyQueryLib.Builders
         {
             return PostgreSqlQuery<T>.Flow(Config, Func).Delete();
         }
+
+        #endregion
+
+        #region Functions
+
+        /// <summary>
+        /// Transforms into <b>COUNT(coumn_name)</b> sql aggregate function
+        /// </summary>
+        /// <returns></returns>
+        public int Count(object _) => default;
+
+        /// <summary>
+        /// Transforms into <b>MIN(coumn_name)</b> sql aggregate function
+        /// </summary>
+        /// <returns></returns>
+        public double Min(object _) => default;
+
+        /// <summary>
+        /// Transforms into <b>MAX(coumn_name)</b> sql aggregate function
+        /// </summary>
+        /// <returns></returns>
+        public double Max(object _) => default;
+
+        /// <summary>
+        /// Transforms into <b>AVG(coumn_name)</b> sql aggregate function
+        /// </summary>
+        /// <returns></returns>
+        public double Avg(object _) => default;
+
+        /// <summary>
+        /// Transforms into <b>SUM(coumn_name)</b> sql aggregate function
+        /// </summary>
+        /// <returns></returns>
+        public double Sum(object _) => default;
+
+        /// <summary>
+        /// Transforms into <b>CONCAT(str1, str2, ...)</b> sql concatenation function
+        /// </summary>
+        /// <returns></returns>
+        public string Concat(params object?[] _) => string.Empty;
+
+        /// <summary>
+        /// Gets alias value by it's name
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public T Alias<T>(string name) => default!;
 
         #endregion
     }

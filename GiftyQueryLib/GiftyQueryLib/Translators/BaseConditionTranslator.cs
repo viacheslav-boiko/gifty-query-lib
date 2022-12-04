@@ -21,20 +21,13 @@ namespace GiftyQueryLib.Translators
         protected StringBuilder sb;
 
         /// <summary>
-        /// Aliases to bind already used logic to them
-        /// </summary>
-        protected Dictionary<string, string> aliases;
-
-        /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="caseType">Naming format</param>
         protected BaseConditionTranslator()
         {
             sb = new StringBuilder();
-
             type = null;
-            aliases = new();
         }
 
         /// <summary>
