@@ -43,6 +43,14 @@ namespace GiftyQueryLib.Functions
         /// <returns></returns>
         public string Concat(params object[] _) => string.Empty;
 
+        /// <summary>
+        /// Gets alias value by it's name
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public T? Alias<T>(string name) => default;
+
         #endregion
 
         #region Dictionaries
@@ -82,7 +90,8 @@ namespace GiftyQueryLib.Functions
             { nameof(Avg), ("AVG({0})", Constants.NumericTypes) },
             { nameof(Min), ("MIN({0})", Constants.NumericTypes) },
             { nameof(Max), ("MAX({0})", Constants.NumericTypes) },
-            { nameof(Concat), ("CONCAT({0})", null) }
+            { nameof(Concat), ("CONCAT({0})", null) },
+            { nameof(Alias), ("HAVING {0}", null) }
         };
 
         #endregion

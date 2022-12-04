@@ -166,9 +166,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="paramName"></param>
         /// <returns></returns>
         protected virtual string ParseMemberExpression(MemberExpression memberExp, string? paramName = null)
-        {
-            var sb = new StringBuilder();
-
+        { 
             if (!config.NotMappedAttributes.Any(attr => memberExp.Member.GetCustomAttribute(attr) is not null))
             {
                 var memberAttributes = GetMemberAttributeArguments(memberExp.Member, config.ForeignKeyAttributes);
@@ -176,13 +174,20 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     ? memberExp.Member.Name.ToCaseFormat(caseConfig)
                     : memberAttributes.FirstOrDefault().ToString().Replace("\"", "");
 
+                var result = string.Format(config.ColumnAccessFormat, config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName);
+
                 if (paramName is null || memberExp.Member.Name.ToCaseFormat(caseConfig) == paramName)
-                    sb.AppendFormat(config.ColumnAccessFormat + ",", config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName);
+                    return result + ",";
                 else
-                    sb.AppendFormat(config.ColumnAccessFormat + " AS {3},", config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName, paramName);
+                {
+                    if (!aliases.TryAdd(paramName, result))
+                        throw new BuilderException($"Alias \"{paramName}\" already exists");
+                    
+                    return string.Format(result + " AS {0},", paramName);
+                }      
             }
 
-            return sb.ToString();
+            return string.Empty;
         }
 
         /// <summary>
@@ -279,8 +284,35 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                         });
 
-                        return string.Format(func.Functions[methodName].value, string.Join(',', columns)) + (paramName is null ? "" : " AS " + paramName);
+                        var result = string.Format(func.Functions[methodName].value, string.Join(',', columns));
+
+                        if (paramName is null)
+                            return result;
+                        
+                        if (!aliases.TryAdd(paramName, result))
+                            throw new BuilderException($"Alias \"{paramName}\" already exists");
+
+                        return result + (paramName is null ? "" : " AS " + paramName);
                     }
+                }
+            }
+            else if (arguments[0] is ConstantExpression cEx)
+            {
+                if (methodName == nameof(func.Alias))
+                {
+                    var alias = cEx?.Value?.ToString()?.ToCaseFormat(caseConfig);
+                    if (alias is null)
+                        throw new BuilderException($"Alias name cannot be null or empty while using HAVING statement");
+
+                    var aliasExists = aliases.TryGetValue(alias, out string? value);
+
+                    if (!aliasExists)
+                        throw new BuilderException($"Alias with name \"{alias}\" does not exist");
+
+                    if (value is null && string.IsNullOrEmpty(value))
+                        throw new BuilderException($"Alias with name \"{alias}\" cannot have an empty value");
+                    
+                    return value;
                 }
             }
             else
@@ -301,21 +333,39 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     if (!func.CheckFunctionAllowedTypes((memberInfo as PropertyInfo)!.PropertyType, methodName))
                         throw new BuilderException($"Type \"{(memberInfo as PropertyInfo)!.PropertyType.Name}\" should not be used in method \"{methodName}\"");
 
-                    format = string.Format(func.Functions[methodName].value, format) + (paramName is null ? "" : " AS " + paramName);
+                    format = string.Format(func.Functions[methodName].value, format);
                 }
 
                 var memberName = memberAttributes is null
                     ? memberInfo.Name.ToCaseFormat(caseConfig)
                     : memberAttributes.FirstOrDefault().ToString();
 
-                sb.AppendFormat(format + ",", config.Scheme, type?.ToCaseFormat(caseConfig), memberName);
+                var result = string.Format(format, config.Scheme, type?.ToCaseFormat(caseConfig), memberName);
+
+                if (paramName is null)
+                    sb.Append(result + ",");
+                else
+                {
+                    if (!aliases.TryAdd(paramName, result))
+                        throw new BuilderException($"Alias \"{paramName}\" already exists");
+                    
+                    sb.Append(result + $" AS {paramName},");
+                }
             }
             else
             {
                 if (CheckIfMethodExists(methodName, func.Functions!))
                 {
-                    string format = func.Functions[methodName].value + (paramName is null ? "" : " AS " + paramName);
-                    sb.AppendFormat(format + ",", translatedInnerExpression);
+                    string result = string.Format(func.Functions[methodName].value, translatedInnerExpression);
+
+                    if (paramName is null)
+                        sb.Append(result + ",");
+                    else
+                    {
+                        if (!aliases.TryAdd(paramName, result))
+                            throw new BuilderException($"Alias \"{paramName}\" already exists");
+                        sb.Append(result + $" AS {paramName},");
+                    }
                 }
             }
 
@@ -330,17 +380,20 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <returns></returns>
         protected virtual string ParseBinaryExpression(BinaryExpression bExp, string? paramName = null)
         {
-            var sb = new StringBuilder();
-
             if (Constants.TypesToStringCast.Contains(bExp.Type))
                 throw new BuilderException($"Binary expression cannot be parsed when left or right operands have type {bExp.Type}. If you want concat strings use PConcat function instead.");
 
             var translator = new PostgreSqlConditionTranslator(config, func);
             string translatedBinary = translator.Translate(type!, bExp);
 
-            sb.AppendFormat(paramName is null ? "{0}," : "{0} AS {1},", translatedBinary, paramName);
-
-            return sb.ToString();
+            if (paramName is null)
+                return translatedBinary + ",";
+            else
+            {
+                if (!aliases.TryAdd(paramName, translatedBinary))
+                    throw new BuilderException($"Alias \"{paramName}\" already exists");
+                return string.Format("{0} AS {1},", translatedBinary, paramName);
+            }
         }
 
         /// <summary>
@@ -358,41 +411,27 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
         protected override Expression VisitUnary(UnaryExpression u)
         {
-            try
-            {
-                string value = func.ExpressionTypes[u.NodeType][0];
-                if (!string.IsNullOrEmpty(value))
-                    sb.Append(value);
-                Visit(u.Operand);
-                return u;
-            }
-            catch
-            {
-                throw new NotSupportedException(string.Format("The unary operator '{0}' is not supported", u.NodeType));
-            }
+            string value = func.ExpressionTypes[u.NodeType][0];
+            if (!string.IsNullOrEmpty(value))
+                sb.Append(value);
+            Visit(u.Operand);
+            return u;
         }
 
         protected override Expression VisitBinary(BinaryExpression b)
         {
-            try
-            {
-                if (!func.ExpressionTypes.ContainsKey(b.NodeType))
-                    throw new NotSupportedException(string.Format("The binary operator '{0}' is not supported", b.NodeType));
+            if (!func.ExpressionTypes.ContainsKey(b.NodeType))
+                throw new BuilderException(string.Format("The binary operator '{0}' is not supported", b.NodeType));
 
-                sb.Append('(');
-                Visit(b.Left);
+            sb.Append('(');
+            Visit(b.Left);
 
-                string[] values = func.ExpressionTypes[b.NodeType];
-                sb.Append(values.Length > 1 ? values[IsNullConstant(b.Right) ? 0 : 1] : values[0]);
+            string[] values = func.ExpressionTypes[b.NodeType];
+            sb.Append(values.Length > 1 ? values[IsNullConstant(b.Right) ? 0 : 1] : values[0]);
 
-                Visit(b.Right);
-                sb.Append(')');
-                return b;
-            }
-            catch
-            {
-                throw new NotSupportedException(string.Format("The binary operator '{0}' is not supported", b.NodeType));
-            }
+            Visit(b.Right);
+            sb.Append(')');
+            return b;
         }
 
         protected override Expression VisitConstant(ConstantExpression c)
@@ -410,7 +449,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 return m;
             }
 
-            throw new NotSupportedException(string.Format("The member '{0}' is not supported", m.Member.Name));
+            throw new BuilderException(string.Format("The member '{0}' is not supported", m.Member.Name));
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression m)

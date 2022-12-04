@@ -22,11 +22,11 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         protected bool selectAllIsUsed = false;
         protected Expression<Func<T, object>>? exceptRowSelector = null;
 
-        private readonly BaseConditionTranslator conditionTranslator;
+        private readonly PostgreSqlConditionTranslator conditionTranslator;
         private readonly PostgreSqlConfig config;
         private readonly CaseFormatterConfig caseConfig;
 
-        private PostgreSqlQuery(BaseConditionTranslator conditionTranslator, PostgreSqlConfig config)
+        private PostgreSqlQuery(PostgreSqlConditionTranslator conditionTranslator, PostgreSqlConfig config)
         {
             this.conditionTranslator = conditionTranslator;
             this.config = config;
@@ -303,7 +303,8 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         public IOrderNode<T> Having(Expression<Func<T, bool>> condition)
         {
-            throw new NotImplementedException();
+            value.Append(string.Format("HAVING {0} ", conditionTranslator.Translate<T>(condition)));
+            return this;
         }
 
         public ILimitNode Order(params (Expression<Func<T, object>> rowSelector, OrderType orderType)[] rowsForOrdering)
