@@ -41,7 +41,7 @@ namespace GiftyQueryLib.Functions
         /// Transforms into <b>CONCAT(str1, str2, ...)</b> sql concatenation function
         /// </summary>
         /// <returns></returns>
-        public string Concat(params object[] _) => string.Empty;
+        public string Concat(params object?[] _) => string.Empty;
 
         /// <summary>
         /// Gets alias value by it's name
@@ -49,7 +49,7 @@ namespace GiftyQueryLib.Functions
         /// <typeparam name="T"></typeparam>
         /// <param name="name"></param>
         /// <returns></returns>
-        public T? Alias<T>(string name) => default;
+        public T Alias<T>(string name) => default;
 
         #endregion
 

@@ -20,6 +20,8 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         protected bool whereIsUsed = false;
         protected bool selectAllIsUsed = false;
+        protected bool groupByIsUsed = false;
+
         protected Expression<Func<T, object>>? exceptRowSelector = null;
 
         private readonly PostgreSqlConditionTranslator conditionTranslator;
@@ -295,6 +297,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         public IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null)
         {
+            groupByIsUsed = true;
             var parsed = conditionTranslator.ParseAnonymousSelector(include, exclude, null, true, false, false, true, false);
             value.AppendFormat("GROUP BY {0} ", parsed.Result);
 
@@ -303,13 +306,23 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         public IOrderNode<T> Having(Expression<Func<T, bool>> condition)
         {
-            value.Append(string.Format("HAVING {0} ", conditionTranslator.Translate<T>(condition)));
+            if (!groupByIsUsed)
+                throw new BuilderException("Group by unique value must be used with having statement");
+            value.AppendFormat("HAVING {0} ", conditionTranslator.Translate<T>(condition));
             return this;
         }
 
-        public ILimitNode Order(params (Expression<Func<T, object>> rowSelector, OrderType orderType)[] rowsForOrdering)
+        public IOrderNode<T> Order(Expression<Func<T, object>> rowSelector, OrderType orderType = OrderType.Asc)
         {
-            throw new NotImplementedException();
+            if (rowSelector is null)
+                throw new BuilderException("Row selector must be provided");
+
+            var parsed = conditionTranslator.ParseAnonymousSelector(rowSelector, null, null, true, true, false, false, false);
+
+            var orderRowsSql = string.Join(',', parsed.Result!.Split(',').Select(it => it + " " + orderType.ToString().ToUpper()));
+            value.AppendFormat("ORDER BY {0} ", orderRowsSql);
+
+            return this;
         }
     }
 }

@@ -20,7 +20,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
     public interface IOrderNode<T> : IQueryStringBuilder, ILimitNode where T : class
     {
-        ILimitNode Order(params (Expression<Func<T, object>> rowSelector, OrderType orderType)[] rowsForOrdering);
+        IOrderNode<T> Order(Expression<Func<T, object>> rowSelector, OrderType orderType = OrderType.Asc);
     }
 
     public interface IHavingNode<T> : IQueryStringBuilder, IOrderNode<T> where T : class

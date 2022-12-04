@@ -75,7 +75,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     {
                         if (!allowMethodCallExpression)
                             throw new BuilderException("Anonymous selector has not allowed expressions that cannot be parsed");
-                        sb.Append(ParseMethodCallExpression(callExp, paramName));
+                        sb.Append(ParseMethodCallExpression(callExp, paramName, true));
                     }
                         
                     else if (exp is BinaryExpression bExp)
@@ -197,7 +197,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="paramName"></param>
         /// <returns></returns>
         /// <exception cref="BuilderException"></exception>
-        protected virtual string ParseMethodCallExpression(MethodCallExpression callExp, string? paramName = null)
+        protected virtual string ParseMethodCallExpression(MethodCallExpression callExp, string? paramName = null, bool isSelectorParsing = false)
         {
             var sb = new StringBuilder();
 
@@ -287,12 +287,12 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                         var result = string.Format(func.Functions[methodName].value, string.Join(',', columns));
 
                         if (paramName is null)
-                            return result;
+                            return result + ",";
                         
                         if (!aliases.TryAdd(paramName, result))
                             throw new BuilderException($"Alias \"{paramName}\" already exists");
 
-                        return result + (paramName is null ? "" : " AS " + paramName);
+                        return result + (paramName is null ? "" : " AS " + paramName) + ",";
                     }
                 }
             }
@@ -312,7 +312,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     if (value is null && string.IsNullOrEmpty(value))
                         throw new BuilderException($"Alias with name \"{alias}\" cannot have an empty value");
                     
-                    return value;
+                    return isSelectorParsing ? alias : value;
                 }
             }
             else
@@ -492,13 +492,20 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             {
                 if (m.Arguments[0] is ConstantExpression cArg)
                 {
-                    var mObj = m.Object as MemberExpression;
-
-                    sb.Append(string.Format(" " + config.ColumnAccessFormat + " LIKE '%{3}%' ",
-                        config.Scheme,
-                        mObj!.Expression!.Type.ToCaseFormat(caseConfig),
-                        mObj.Member.Name.ToCaseFormat(caseConfig),
-                        cArg.Value));
+                    if (m.Object is MethodCallExpression mcExp && mcExp.Method.Name == nameof(func.Alias))
+                    {
+                        sb.AppendFormat(" {0} LIKE '%{1}%' ", ParseMethodCallExpression(mcExp, isSelectorParsing: true), cArg.Value);
+                    }
+                    else if (m.Object is MemberExpression mExp)
+                    {
+                        sb.AppendFormat(" " + config.ColumnAccessFormat + " LIKE '%{3}%' ",
+                            config.Scheme,
+                            mExp!.Expression!.Type.ToCaseFormat(caseConfig),
+                            mExp.Member.Name.ToCaseFormat(caseConfig),
+                            cArg.Value);
+                    }
+                    else
+                        throw new BuilderException("Contains Method argument is invalid");
 
                     return sb.ToString();
                 }
@@ -508,7 +515,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     expObj = m.Object;
                 }
                 else
-                    throw new BuilderException("Method argument is invalid");
+                    throw new BuilderException("Contains Method argument is invalid");
 
             }
             else if (m.Arguments.Count == 2)
