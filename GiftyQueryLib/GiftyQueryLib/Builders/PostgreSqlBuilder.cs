@@ -1,4 +1,5 @@
 ﻿using GiftyQueryLib.Config;
+using GiftyQueryLib.Enums;
 using GiftyQueryLib.Functions;
 using GiftyQueryLib.Queries.PostgreSQL;
 using System.Linq.Expressions;
@@ -14,6 +15,23 @@ namespace GiftyQueryLib.Builders
         /// <param name="config">PostgreSQL Configuration</param>
         /// <returns></returns>
         public IInstructionNode<T> UseConfig<T>(PostgreSqlConfig config) where T : class;
+
+        /// <summary>
+        /// Set up custom scheme for PostgreSQL builder
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="scheme">PostgreSQL Scheme</param>
+        /// <returns></returns>
+        public IInstructionNode<T> UseScheme<T>(string scheme) where T : class;
+
+        /// <summary>
+        /// Set up custom case for PostgreSQL builder
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="caseType">PostgreSQL Case Type</param>
+        /// <param name="caseFormatterFunc">PostgreSQL Case Formatter Func</param>
+        /// <returns></returns>
+        public IInstructionNode<T> UseCaseFormat<T>(CaseType caseType, Func<string, string>? caseFormatterFunc = null) where T : class;
 
         /// <summary>
         /// PostgreSQL Select Query
@@ -77,6 +95,34 @@ namespace GiftyQueryLib.Builders
         /// <returns></returns>
         public IInstructionNode<T> UseConfig<T>(PostgreSqlConfig config) where T : class
         {
+            return PostgreSqlQuery<T>.Flow(config, Func);
+        }
+
+        /// <summary>
+        /// Set up custom scheme for PostgreSQL builder
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="scheme">PostgreSQL Scheme</param>
+        /// <returns></returns>
+        public IInstructionNode<T> UseScheme<T>(string scheme) where T : class
+        {
+            var config = new PostgreSqlConfig(Config) { Scheme = scheme };
+            return PostgreSqlQuery<T>.Flow(config, Func);
+        }
+
+        /// <summary>
+        /// Set up custom case for PostgreSQL builder
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="caseType">PostgreSQL Case Type</param>
+        /// <param name="caseFormatterFunc">PostgreSQL Case Formatter Func</param>
+        /// <returns></returns>
+        public IInstructionNode<T> UseCaseFormat<T>(CaseType caseType, Func<string, string>? caseFormatterFunc = null) where T : class
+        {
+            var config = new PostgreSqlConfig(Config) { CaseType = caseType };
+            if (caseFormatterFunc is not null && caseType == CaseType.Custom)
+                config.CaseFormatterFunc = caseFormatterFunc;
+
             return PostgreSqlQuery<T>.Flow(config, Func);
         }
 
