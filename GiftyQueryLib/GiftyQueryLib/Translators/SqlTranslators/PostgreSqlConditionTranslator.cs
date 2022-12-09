@@ -448,9 +448,28 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (m.Expression is not null && (m.Expression.NodeType == ExpressionType.Parameter || m.Expression.NodeType == ExpressionType.MemberAccess))
             {
                 if (m.Member.Name == "Length" && m.Expression is MemberExpression mExp && mExp.Type == typeof(string))
+                {
                     sb.AppendFormat($"LENGTH({config.ColumnAccessFormat})", config.Scheme, type?.ToCaseFormat(caseConfig), mExp.Member.Name.ToCaseFormat(caseConfig));
+                }
                 else
+                {
                     sb.AppendFormat(config.ColumnAccessFormat, config.Scheme, type?.ToCaseFormat(caseConfig), m.Member.Name.ToCaseFormat(caseConfig));
+                }
+
+                return m;
+            }
+            else if (m.NodeType == ExpressionType.MemberAccess)
+            {
+                if (m.Type == typeof(DateTime))
+                {
+                    var dateTimeProp = typeof(DateTime).GetProperty(m.Member.Name);
+                    if (dateTimeProp is not null)
+                    {
+                        var value = (DateTime?)dateTimeProp.GetValue(null);
+                        sb.Append(value is null ? "NULL" : $"'{value}'");
+                    }
+                }
+
                 return m;
             }
 
