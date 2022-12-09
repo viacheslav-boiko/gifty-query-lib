@@ -439,7 +439,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         protected override Expression VisitConstant(ConstantExpression c)
         {
             IQueryable? q = c.Value as IQueryable;
-            sb.Append(q is null && c.Value is null ? "NULL" : c.Value is string st ? string.Format("'{0}'", st) : c.Value);
+            sb.Append(q is null && c.Value is null ? "NULL" : c.Value is string or DateTime or TimeSpan ? string.Format("'{0}'", c.Value) : c.Value);
             return c;
         }
 
