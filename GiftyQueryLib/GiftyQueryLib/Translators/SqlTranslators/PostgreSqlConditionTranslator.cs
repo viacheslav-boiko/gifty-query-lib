@@ -447,7 +447,10 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         {
             if (m.Expression is not null && (m.Expression.NodeType == ExpressionType.Parameter || m.Expression.NodeType == ExpressionType.MemberAccess))
             {
-                sb.Append(string.Format(config.ColumnAccessFormat, config.Scheme, type?.ToCaseFormat(caseConfig), m.Member.Name.ToCaseFormat(caseConfig)));
+                if (m.Member.Name == "Length" && m.Expression is MemberExpression mExp && mExp.Type == typeof(string))
+                    sb.AppendFormat($"LENGTH({config.ColumnAccessFormat})", config.Scheme, type?.ToCaseFormat(caseConfig), mExp.Member.Name.ToCaseFormat(caseConfig));
+                else
+                    sb.AppendFormat(config.ColumnAccessFormat, config.Scheme, type?.ToCaseFormat(caseConfig), m.Member.Name.ToCaseFormat(caseConfig));
                 return m;
             }
 
@@ -634,7 +637,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
             if (m.Object is MemberExpression memberExp)
             {
-                return string.Format(config.ColumnAccessFormat + "::varchar(255)", config.Scheme, type?.ToCaseFormat(caseConfig), memberExp.Member.Name.ToCaseFormat(caseConfig));
+                return string.Format(config.ColumnAccessFormat + "::text", config.Scheme, type?.ToCaseFormat(caseConfig), memberExp.Member.Name.ToCaseFormat(caseConfig));
             }
             else if (m.Object is ConstantExpression constExp)
             {
