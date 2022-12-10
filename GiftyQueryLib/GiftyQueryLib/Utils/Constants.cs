@@ -2,7 +2,7 @@
 {
     public static class Constants
     {
-        public static HashSet<Type> TypesToStringCast => new()
+        public static HashSet<Type> StringTypes => new()
         {
             typeof(string), typeof(char), typeof(Guid), typeof(DateTime), typeof(TimeSpan)
         };

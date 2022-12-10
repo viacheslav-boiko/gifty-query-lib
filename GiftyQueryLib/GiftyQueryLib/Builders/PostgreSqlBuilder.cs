@@ -8,6 +8,7 @@ namespace GiftyQueryLib.Builders
 {
     public interface IPostgreSqlBuilder
     {
+        #region Customized Configuration
         /// <summary>
         /// Set up custom configuration for PostgreSQL builder
         /// </summary>
@@ -33,6 +34,10 @@ namespace GiftyQueryLib.Builders
         /// <returns></returns>
         public IInstructionNode<T> UseCaseFormat<T>(CaseType caseType, Func<string, string>? caseFormatterFunc = null) where T : class;
 
+        #endregion
+
+        #region Basic Queries
+
         /// <summary>
         /// PostgreSQL Select Query
         /// </summary>
@@ -53,14 +58,16 @@ namespace GiftyQueryLib.Builders
         /// PostgreSQL Update Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="entities">Entities to update</param>
-        public IEditConditionNode<T> Update<T>(params T[] entities) where T : class;
+        /// <param name="entities">Entity to update</param>
+        public IEditConditionNode<T> Update<T>(T entity) where T : class;
 
         /// <summary>
         /// PostgreSQL Delete Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
         public IEditConditionNode<T> Delete<T>() where T : class;
+
+        #endregion
 
         /// <summary>
         /// PostgreSQL Functions
@@ -152,10 +159,10 @@ namespace GiftyQueryLib.Builders
         /// PostgreSQL Update Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="entities">Entities to update</param>
-        public virtual IEditConditionNode<T> Update<T>(params T[] entities) where T : class
+        /// <param name="entities">Entity to update</param>
+        public virtual IEditConditionNode<T> Update<T>(T entity) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Update(entities);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Update(entity);
         }
 
         /// <summary>

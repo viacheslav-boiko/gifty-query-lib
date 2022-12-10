@@ -304,15 +304,15 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 {
                     var alias = cEx?.Value?.ToString()?.ToCaseFormat(caseConfig);
                     if (alias is null)
-                        throw new BuilderException($"Alias name cannot be null or empty while using HAVING statement");
+                        throw new BuilderException($"Alias cannot be null or empty while using HAVING statement");
 
                     var aliasExists = aliases.TryGetValue(alias, out string? value);
 
                     if (!aliasExists)
-                        throw new BuilderException($"Alias with name \"{alias}\" does not exist");
+                        throw new BuilderException($"Alias \"{cEx?.Value}\" does not exist");
 
                     if (value is null && string.IsNullOrEmpty(value))
-                        throw new BuilderException($"Alias with name \"{alias}\" cannot have an empty value");
+                        throw new BuilderException($"Alias \"{cEx?.Value}\" cannot have an empty value");
 
                     return isSelectorParsing ? alias : value;
                 }
@@ -382,7 +382,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <returns></returns>
         protected virtual string ParseBinaryExpression(BinaryExpression bExp, string? paramName = null)
         {
-            if (Constants.TypesToStringCast.Contains(bExp.Type))
+            if (Constants.StringTypes.Contains(bExp.Type))
                 throw new BuilderException($"Binary expression cannot be parsed when left or right operands have type {bExp.Type}. If you want concat strings use PConcat function instead.");
 
             var translator = new PostgreSqlConditionTranslator(config, func);
@@ -438,8 +438,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
         protected override Expression VisitConstant(ConstantExpression c)
         {
-            IQueryable? q = c.Value as IQueryable;
-            sb.Append(q is null && c.Value is null ? "NULL" : c.Value is string or DateTime or TimeSpan ? string.Format("'{0}'", c.Value) : c.Value);
+            sb.Append(c.Value is null ? "NULL" : Constants.StringTypes.Contains(c.Value!.GetType()) ? string.Format("'{0}'", c.Value) : c.Value);
             return c;
         }
 
@@ -490,7 +489,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                         var value = (DateTime?)dateTimeProp.GetValue(null);
                         var result = m.Method.Invoke(value, null);
                         sb.Append($"'{(result is null ? "NULL" : result)}'");
-                    }   
+                    }
                 }
                 return m;
             }
@@ -687,7 +686,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         {
             if (items is not null && items.Any())
             {
-                if (Constants.TypesToStringCast.Contains(typeof(TItem)))
+                if (Constants.StringTypes.Contains(typeof(TItem)))
                     sb.Append(string.Format(" " + config.ColumnAccessFormat + " IN ({3}) ", config.Scheme, type?.ToCaseFormat(caseConfig), arg.ToCaseFormat(caseConfig), string.Join(',', items.Select(it => $"'{it}'"))));
                 else
                     sb.Append(string.Format(" " + config.ColumnAccessFormat + " IN ({3}) ", config.Scheme, type?.ToCaseFormat(caseConfig), arg.ToCaseFormat(caseConfig), string.Join(',', items)));
@@ -699,7 +698,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (item is null)
                 return string.Empty;
 
-            if (Constants.TypesToStringCast.Contains(item.GetType()))
+            if (Constants.StringTypes.Contains(item.GetType()))
                 return string.Format("'{0}'", item.ToString());
             else
                 return string.Format("{0}", item.ToString());

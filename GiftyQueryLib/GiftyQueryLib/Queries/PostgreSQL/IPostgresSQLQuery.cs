@@ -8,44 +8,48 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         string Build();
     }
 
-    public interface IOffsetNode : IQueryStringBuilder
+    public interface ISelectNode : IQueryStringBuilder
+    {
+    }
+
+    public interface IOffsetNode : ISelectNode
     {
         IQueryStringBuilder Offset(int skipped);
     }
 
-    public interface ILimitNode : IQueryStringBuilder, IOffsetNode
+    public interface ILimitNode : ISelectNode, IOffsetNode
     {
         IOffsetNode Limit(int limit);
     }
 
-    public interface IOrderNode<T> : IQueryStringBuilder, ILimitNode where T : class
+    public interface IOrderNode<T> : ISelectNode, ILimitNode where T : class
     {
         IOrderNode<T> Order(Expression<Func<T, object>> rowSelector, OrderType orderType = OrderType.Asc);
     }
 
-    public interface IHavingNode<T> : IQueryStringBuilder, IOrderNode<T> where T : class
+    public interface IHavingNode<T> : ISelectNode, IOrderNode<T> where T : class
     {
         IOrderNode<T> Having(Expression<Func<T, bool>> condition);
     }
 
-    public interface IGroupNode<T> : IQueryStringBuilder, IHavingNode<T> where T : class
+    public interface IGroupNode<T> : ISelectNode, IHavingNode<T> where T : class
     {
         IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null);
     }
 
-    public interface IWhereNode<T> : IQueryStringBuilder, IGroupNode<T> where T : class
+    public interface IWhereNode<T> : ISelectNode, IGroupNode<T> where T : class
     {
         IWhereNode<T> Where(Expression<Func<T, bool>> condition);
     }
 
-    public interface IJoinNode<T> : IQueryStringBuilder, IWhereNode<T> where T : class
+    public interface IJoinNode<T> : ISelectNode, IWhereNode<T> where T : class
     {
         IJoinNode<T> Join(Expression<Func<T, object>> selector, JoinType joinType = JoinType.Inner);
 
         IJoinNode<T> Join<U>(Expression<Func<U, object>> selector, JoinType joinType = JoinType.Inner);
     }
 
-    public interface IConditionNode<T> : IQueryStringBuilder, IJoinNode<T> where T : class
+    public interface IConditionNode<T> : ISelectNode, IJoinNode<T> where T : class
     {
         IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null, CountType countType = CountType.Count);
     }
@@ -61,7 +65,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         IQueryStringBuilder Insert(params T[] entities);
 
-        IEditConditionNode<T> Update(params T[] entities);
+        IEditConditionNode<T> Update(T entity);
 
         IEditConditionNode<T> Delete();
     }

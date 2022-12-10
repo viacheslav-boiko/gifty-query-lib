@@ -60,9 +60,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         public virtual IQueryStringBuilder Insert(params T[] entities)
         {
             if (entities is null || entities.Length == 0)
-            {
-                throw new BuilderException("At least one parameter should be provided");
-            }
+                throw new BuilderException("At least one entity should be provided");
 
             var values = new List<string>();
             var nonNullableProps = new HashSet<string>();
@@ -129,7 +127,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                                     .FirstOrDefault(attr => config.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
 
                             if (keyProp is null)
-                                throw new BuilderException($"The related table class {property.Name} does not contain key attribute");
+                                throw new BuilderException($"Related table class {property.Name} does not contain key attribute");
 
                             var keyPropValue = property.GetValue(entity);
 
@@ -147,7 +145,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                         else
                         {
                             var type = value.GetType();
-                            if (Constants.TypesToStringCast.Contains(type))
+                            if (Constants.StringTypes.Contains(type))
                                 subvalues.Add(string.Format("'{0}'", value.ToString()));
                             else
                                 subvalues.Add(string.Format("{0}", value.ToString()));
@@ -166,9 +164,72 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             return this;
         }
 
-        public virtual IEditConditionNode<T> Update(params T[] entities)
+        public virtual IEditConditionNode<T> Update(T entity)
         {
-            // TODO
+            if (entity is null)
+                throw new BuilderException("Entity cannot be null");
+
+            var pairs = new List<string>();
+            var props = entity.GetType().GetProperties();
+            
+            foreach(var property in props)
+            {
+                var attributeData = property.GetCustomAttributesData();
+
+                CustomAttributeData? keyAttrData = null;
+                CustomAttributeData? notMappedAttrData = null;
+                CustomAttributeData? foreignKeyAttrData = null;
+
+                foreach (var attr in attributeData)
+                {
+                    if (config.KeyAttributes.Any(type => attr.AttributeType == type)) keyAttrData = attr;
+                    if (config.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
+                    if (config.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
+                }
+
+                if (keyAttrData is not null || notMappedAttrData is not null)
+                    continue;
+
+                string propName = string.Empty;
+                object? value = null;
+
+                if (foreignKeyAttrData is not null)
+                {
+                    propName = foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
+
+                    var keyProp = property.PropertyType
+                                .GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true)
+                                    .FirstOrDefault(attr => config.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
+                    if (keyProp is null)
+                        throw new BuilderException($"Related table class {property.Name} does not contain key attribute");
+
+                    var keyPropValue = property.GetValue(entity);
+                    value = keyProp.GetValue(keyPropValue);
+                }
+                else
+                {
+                    propName = property.Name.ToCaseFormat(caseConfig);
+                    value = property.GetValue(entity);
+                }
+
+                string parsedValue = "NULL";
+
+                if (value is not null)
+                {
+                    var type = value.GetType();
+                    if (Constants.StringTypes.Contains(type))
+                        parsedValue = string.Format("'{0}'", value.ToString());
+                    else
+                        parsedValue = string.Format("{0}", value.ToString());
+                }
+
+                pairs.Add(string.Format(config.ColumnAccessFormat + " = {3}", config.Scheme, typeof(T).ToCaseFormat(caseConfig), propName, parsedValue));
+            }
+
+            string pairsSql = string.Join(',', pairs);
+
+            value = new StringBuilder(string.Format("UPDATE {0}.{1} SET {2} ", config.Scheme, typeof(T).ToCaseFormat(caseConfig), pairsSql));
+
             return this;
         }
 
