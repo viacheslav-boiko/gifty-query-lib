@@ -478,6 +478,23 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
         protected override Expression VisitMethodCall(MethodCallExpression m)
         {
+            if (m.Type == typeof(DateTime))
+            {
+                var obj = m.Object;
+
+                if (obj is not null and MemberExpression mExp)
+                {
+                    var dateTimeProp = typeof(DateTime).GetProperty(mExp.Member.Name);
+                    if (dateTimeProp is not null)
+                    {
+                        var value = (DateTime?)dateTimeProp.GetValue(null);
+                        var result = m.Method.Invoke(value, null);
+                        sb.Append($"'{(result is null ? "NULL" : result)}'");
+                    }   
+                }
+                return m;
+            }
+
             if (func.Functions.ContainsKey(m.Method.Name))
             {
                 string parsed = ParseMethodCallExpression(m);
