@@ -55,11 +55,18 @@ namespace GiftyQueryLib.Builders
         public IQueryStringBuilder Insert<T>(params T[] entities) where T : class;
 
         /// <summary>
-        /// PostgreSQL Update Query
+        /// PostgreSQL Update Single Entity Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="entities">Entity to update</param>
-        public IEditConditionNode<T> Update<T>(T entity) where T : class;
+        public IEditConditionNode<T> Update<T>(object entity) where T : class;
+
+        /// <summary>
+        /// PostgreSQL Update Multiple Entities Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="entities">Entities to update</param>
+        public IQueryStringBuilder UpdateRange<T>(params object[] entities) where T : class;
 
         /// <summary>
         /// PostgreSQL Delete Query
@@ -156,13 +163,23 @@ namespace GiftyQueryLib.Builders
         }
 
         /// <summary>
-        /// PostgreSQL Update Query
+        /// PostgreSQL Update Single Entity Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="entities">Entity to update</param>
-        public virtual IEditConditionNode<T> Update<T>(T entity) where T : class
+        public virtual IEditConditionNode<T> Update<T>(object entity) where T : class
         {
             return PostgreSqlQuery<T>.Flow(Config, Func).Update(entity);
+        }
+
+        /// <summary>
+        /// PostgreSQL Update Multiple Entities Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="entities">Entities to update</param>
+        public IQueryStringBuilder UpdateRange<T>(params object[] entities) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(Config, Func).UpdateRange(entities);
         }
 
         /// <summary>

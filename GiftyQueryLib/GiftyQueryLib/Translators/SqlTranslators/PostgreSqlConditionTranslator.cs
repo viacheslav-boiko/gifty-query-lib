@@ -12,7 +12,7 @@ using System.Text;
 namespace GiftyQueryLib.Translators.SqlTranslators
 {
     /// <summary>
-    /// PostgreSQL condition translator that translates Expression tree into the base SQL "where" syntax<br/>
+    /// PostgreSQL condition translator that translates Expression tree into the base SQL "where" syntax and performs selectors parsing
     /// </summary>
     public class PostgreSqlConditionTranslator : BaseConditionTranslator
     {
@@ -27,6 +27,80 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             this.config = config;
             this.caseConfig = new CaseFormatterConfig { CaseType = config.CaseType, CaseFormatterFunc = config.CaseFormatterFunc };
             this.func = func;
+        }
+
+        /// <summary>
+        /// Returns attribute data for property
+        /// </summary>
+        /// <param name="property">Target property</param>
+        /// <returns></returns>
+        public virtual (CustomAttributeData? keyAttrData, CustomAttributeData? notMappedAttrData, CustomAttributeData? foreignKeyAttrData) GetAttrData(PropertyInfo? property)
+        {
+            var attributeData = property is null ? new List<CustomAttributeData>() : property.GetCustomAttributesData();
+
+            CustomAttributeData? keyAttrData = null;
+            CustomAttributeData? notMappedAttrData = null;
+            CustomAttributeData? foreignKeyAttrData = null;
+
+            foreach (var attr in attributeData)
+            {
+                if (config.KeyAttributes.Any(type => attr.AttributeType == type)) keyAttrData = attr;
+                if (config.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
+                if (config.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
+            }
+
+            return (keyAttrData, notMappedAttrData, foreignKeyAttrData);
+        }
+
+        /// <summary>
+        /// Returns properties and their values from entity
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="entity">Entity to parse</param>
+        /// <param name="removeKeyProp">Determine if remove key prop or not</param>
+        /// <returns></returns>
+        /// <exception cref="BuilderException"></exception>
+        public virtual Dictionary<string, object?> GetPopertyWithValueOfEntity<T>(T entity, bool removeKeyProp = true) where T :class
+        {
+            if (entity is null)
+                throw new BuilderException("Entity cannot be null");
+
+            var dict = new Dictionary<string, object?>();
+            var props = entity.GetType().GetProperties();
+
+            foreach (var property in props)
+            {
+                var (keyAttrData, notMappedAttrData, foreignKeyAttrData) = GetAttrData(property);
+
+                if ((keyAttrData is not null && removeKeyProp) || notMappedAttrData is not null)
+                    continue;
+
+                string propName = string.Empty;
+                object? value = null;
+
+                if (foreignKeyAttrData is not null)
+                {
+                    propName = foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
+
+                    var keyProp = property.PropertyType
+                                .GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true)
+                                    .FirstOrDefault(attr => config.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
+                    if (keyProp is null)
+                        throw new BuilderException($"Related table class {property.Name} does not contain key attribute");
+
+                    var keyPropValue = property.GetValue(entity);
+                    value = keyProp.GetValue(keyPropValue);
+                }
+                else
+                {
+                    propName = property.Name.ToCaseFormat(caseConfig);
+                    value = property.GetValue(entity);
+                }
+
+                dict.Add(propName, value);
+            }
+
+            return dict;
         }
 
         /// <summary>
@@ -138,16 +212,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             var type = extraType ?? typeof(TItem);
             foreach (var property in type.GetProperties())
             {
-                var attributeData = property.GetCustomAttributesData();
-
-                CustomAttributeData? notMappedAttrData = null;
-                CustomAttributeData? foreignKeyAttrData = null;
-
-                foreach (var attr in attributeData)
-                {
-                    if (config.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
-                    if (config.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
-                }
+                var (keyAttrData, notMappedAttrData, foreignKeyAttrData) = GetAttrData(property);
 
                 if (notMappedAttrData is not null || (exceptSelector is not null && exceptMembers.Any(it => it.Name == property.Name)))
                     continue;

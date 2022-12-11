@@ -65,7 +65,9 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         IQueryStringBuilder Insert(params T[] entities);
 
-        IEditConditionNode<T> Update(T entity);
+        IEditConditionNode<T> Update(object entity);
+
+        IQueryStringBuilder UpdateRange(params object[] entities);
 
         IEditConditionNode<T> Delete();
     }
