@@ -21,11 +21,6 @@
         Inner, Left, Right, Full, Cross
     }
 
-    public enum CountType
-    {
-        Count, Min, Max, Sum, Avg
-    }
-
     public enum SelectType
     {
         All

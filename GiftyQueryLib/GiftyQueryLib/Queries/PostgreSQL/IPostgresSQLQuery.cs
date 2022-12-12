@@ -49,11 +49,6 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         IJoinNode<T> Join<U>(Expression<Func<U, object>> selector, JoinType joinType = JoinType.Inner);
     }
 
-    public interface IConditionNode<T> : ISelectNode, IJoinNode<T> where T : class
-    {
-        IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null, CountType countType = CountType.Count);
-    }
-
     public interface IEditConditionNode<T> : IQueryStringBuilder where T : class
     {
         IQueryStringBuilder Predicate(Expression<Func<T, bool>> condition);
@@ -61,7 +56,9 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
     public interface IInstructionNode<T> : IQueryStringBuilder where T : class
     {
-        IConditionNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false);
+        IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null, bool distinct = false);
+
+        IJoinNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false);
 
         IQueryStringBuilder Insert(params T[] entities);
 

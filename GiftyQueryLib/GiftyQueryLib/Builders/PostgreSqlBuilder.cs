@@ -39,13 +39,22 @@ namespace GiftyQueryLib.Builders
         #region Basic Queries
 
         /// <summary>
+        /// PostgreSQL Select Count Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="rowSelector">Row to count by</param>
+        /// <param name="distinct">Is selection distinct</param>
+        /// <returns></returns>
+        IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null, bool distinct = false) where T : class;
+
+        /// <summary>
         /// PostgreSQL Select Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="include">Columns to include into selection</param>
         /// <param name="exclude">Columns to exclude from selection</param>
         /// <param name="distinct">Is selection distinct</param>
-        public IConditionNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false) where T : class;
+        public IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false) where T : class;
 
         /// <summary>
         /// PostgreSQL Insert Query
@@ -141,13 +150,25 @@ namespace GiftyQueryLib.Builders
         }
 
         /// <summary>
+        /// PostgreSQL Select Count Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="rowSelector">Row to count by</param>
+        /// <param name="distinct">Is selection distinct</param>
+        /// <returns></returns>
+        public IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null, bool distinct = false) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(Config, Func).Count(rowSelector, distinct);
+        }
+
+        /// <summary>
         /// PostgreSQL Select Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="include">Columns to include into selection</param>
         /// <param name="exclude">Columns to exclude from selection</param>
         /// <param name="distinct">Is selection distinct</param>
-        public virtual IConditionNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false) where T : class
+        public virtual IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false) where T : class
         {
             return PostgreSqlQuery<T>.Flow(Config, Func).Select(include, exclude, distinct);
         }

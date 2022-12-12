@@ -7,13 +7,12 @@ using GiftyQueryLib.Translators.SqlTranslators;
 using GiftyQueryLib.Utils;
 using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Text;
 
 namespace GiftyQueryLib.Queries.PostgreSQL
 {
     public class PostgreSqlQuery<T> :
-       IInstructionNode<T>, IEditConditionNode<T>, IConditionNode<T>, IJoinNode<T>, IWhereNode<T>, IGroupNode<T>, IHavingNode<T>, IOrderNode<T>, ILimitNode, IOffsetNode where T : class
+       IInstructionNode<T>, IEditConditionNode<T>, IJoinNode<T>, IWhereNode<T>, IGroupNode<T>, IHavingNode<T>, IOrderNode<T>, ILimitNode, IOffsetNode where T : class
     {
         protected StringBuilder value = new(string.Empty);
 
@@ -39,7 +38,31 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             return new PostgreSqlQuery<T>(new PostgreSqlConditionTranslator(config, func), config);
         }
 
-        public virtual IConditionNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false)
+        public virtual IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null, bool distinct = false)
+        {
+            string sql = "SELECT ";
+            string sqlDistinct = distinct ? "DISTINCT " : string.Empty;
+            string sqlCount = "COUNT({0}) AS {1} ";
+
+            if (rowSelector is not null)
+            {
+                var data = conditionTranslator.GetMemberData(rowSelector);
+                var info = data.MemberInfo;
+                var type = data.CallerType?.ToCaseFormat(caseConfig);
+                var name = info?.Name?.ToCaseFormat(caseConfig);
+                sqlCount = string.Format(sqlCount, string.Format(config.ColumnAccessFormat, config.Scheme, type, name), "count_" + name);
+            }
+            else
+            {
+                sqlCount = string.Format(sqlCount, "*", "count_all");
+            }
+
+            value = new StringBuilder(sql + sqlDistinct + sqlCount);
+
+            return this;
+        }
+
+        public virtual IJoinNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false)
         {
             string sql = "SELECT ";
             string sqlDistinct = distinct ? "DISTINCT " : string.Empty;
@@ -158,8 +181,8 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             entityData.ToList().ForEach(pair =>
             {
                 var value = pair.Value;
-                var parsedValue = value is null 
-                    ? "NULL" : string.Format(Constants.StringTypes.Contains(value.GetType()) 
+                var parsedValue = value is null
+                    ? "NULL" : string.Format(Constants.StringTypes.Contains(value.GetType())
                         ? "'{0}'" : "{0}", value.ToString());
 
                 pairs.AppendFormat(config.ColumnAccessFormat + " = {3}, ", config.Scheme, type, pair.Key, parsedValue);
@@ -199,7 +222,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                         propsSb.Append(prop + ", ");
                         pairsSb.AppendFormat(config.ColumnAccessFormat + " = {3}, ", config.Scheme,
                             type, prop, tempTable + "." + prop);
-                    } 
+                    }
 
                     var value = pair.Value;
                     var parsedValue = value is null
@@ -226,7 +249,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             var pairsSql = pairsSb.ToString();
             pairsSql = pairsSql.Remove(pairsSql.Length - 2);
 
-            value = new StringBuilder(string.Format("UPDATE {0}.{1} SET {2} FROM (VALUES {3}) AS {4} ({5})", 
+            value = new StringBuilder(string.Format("UPDATE {0}.{1} SET {2} FROM (VALUES {3}) AS {4} ({5})",
                 config.Scheme, type, pairsSql, valuesSetSql, tempTable, propsSql));
 
             return this;
@@ -235,22 +258,6 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         public virtual IEditConditionNode<T> Delete()
         {
             value = new StringBuilder(string.Format("DELETE FROM {0}.{1} ", config.Scheme, typeof(T).ToCaseFormat(caseConfig)));
-
-            return this;
-        }
-
-        public virtual IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null, CountType countType = CountType.Count)
-        {
-            if (countType != CountType.Count && rowSelector is null)
-            {
-                //TODO: Text for exception
-                throw new Exception("");
-            }
-
-            if (rowSelector is null)
-            {
-
-            }
 
             return this;
         }

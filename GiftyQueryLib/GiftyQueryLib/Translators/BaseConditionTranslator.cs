@@ -90,7 +90,7 @@ namespace GiftyQueryLib.Translators
                 return new MemberData
                 {
                     MemberType = unaryExpression.Type,
-                    CallerType = null,
+                    CallerType = unaryExpression.Operand is MethodCallExpression ? null : ((MemberExpression)unaryExpression.Operand)?.Expression?.Type,
                     MemberInfo = memberInfo
                 };
             }
