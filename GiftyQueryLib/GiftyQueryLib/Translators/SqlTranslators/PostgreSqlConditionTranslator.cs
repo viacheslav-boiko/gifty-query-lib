@@ -60,7 +60,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="removeKeyProp">Determine if remove key prop or not</param>
         /// <returns></returns>
         /// <exception cref="BuilderException"></exception>
-        public virtual Dictionary<string, object?> GetPopertyWithValueOfEntity<T>(T entity, bool removeKeyProp = true) where T :class
+        public virtual Dictionary<string, object?> GetPopertyWithValueOfEntity<T>(T entity, bool removeKeyProp = true) where T : class
         {
             if (entity is null)
                 throw new BuilderException("Entity cannot be null");
@@ -80,21 +80,48 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 if (foreignKeyAttrData is not null)
                 {
-                    propName = foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
+                    if (!property.IsCollection())
+                    {
+                        propName = foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
 
-                    var keyProp = property.PropertyType
-                                .GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true)
-                                    .FirstOrDefault(attr => config.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
-                    if (keyProp is null)
-                        throw new BuilderException($"Related table class {property.Name} does not contain key attribute");
+                        var keyProp = property.PropertyType.GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true)
+                              .FirstOrDefault(attr => config.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
+                        if (keyProp is null)
+                            throw new BuilderException($"Related table class {property.Name} does not contain key attribute");
 
-                    var keyPropValue = property.GetValue(entity);
-                    value = keyProp.GetValue(keyPropValue);
+                        var keyPropValue = property.GetValue(entity);
+                        value = keyProp.GetValue(keyPropValue);
+                    }
+                    else
+                    {
+                        var genericArg = property.GetGenericArg();
+                        if (Constants.StringTypes.Contains(genericArg!) || Constants.NumericTypes.Contains(genericArg!))
+                            throw new BuilderException("Primitive-typed collection should not be marked with foreign key attributes");
+                        else
+                        {
+                            // Handle many to many
+                            continue;
+                        }
+                    }
                 }
                 else
                 {
-                    propName = property.Name.ToCaseFormat(caseConfig);
-                    value = property.GetValue(entity);
+                    if (!property.IsCollection())
+                    {
+                        propName = property.Name.ToCaseFormat(caseConfig);
+                        value = property.GetValue(entity);
+                    }
+                    else
+                    {
+                        var genericArg = property.GetGenericArg();
+                        if (Constants.StringTypes.Contains(genericArg!) || Constants.NumericTypes.Contains(genericArg))
+                        {
+                            propName = property.Name.ToCaseFormat(caseConfig);
+                            // TODO Handle PostgreSQL Arrays
+                        }
+                        else
+                            continue;
+                    }
                 }
 
                 dict.Add(propName, value);
@@ -513,11 +540,13 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             {
                 if (m.Member.Name == "Length" && m.Expression is MemberExpression mExp && mExp.Type == typeof(string))
                 {
-                    sb.AppendFormat($"LENGTH({config.ColumnAccessFormat})", config.Scheme, type?.ToCaseFormat(caseConfig), mExp.Member.Name.ToCaseFormat(caseConfig));
+                    var targetType = mExp.Expression?.Type?.ToCaseFormat(caseConfig);
+                    sb.AppendFormat($"LENGTH({config.ColumnAccessFormat})", config.Scheme, targetType, mExp.Member.Name.ToCaseFormat(caseConfig));
                 }
                 else
                 {
-                    sb.AppendFormat(config.ColumnAccessFormat, config.Scheme, type?.ToCaseFormat(caseConfig), m.Member.Name.ToCaseFormat(caseConfig));
+                    var targetType = m.Expression.Type;
+                    sb.AppendFormat(config.ColumnAccessFormat, config.Scheme, targetType?.ToCaseFormat(caseConfig), m.Member.Name.ToCaseFormat(caseConfig));
                 }
 
                 return m;
@@ -583,6 +612,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 "ToLower" or "ToLowerInvariant" => GetUpperLowerMethodTranslated(m, true),
                 "ToUpper" or "ToUpperInvariant" => GetUpperLowerMethodTranslated(m, false),
                 "ToString" => GetToStringMethodTranslated(m),
+                "Any" => GetAnyMethodTranslated(m),
                 _ => string.Empty,
             };
         }
@@ -745,6 +775,30 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             }
 
             return string.Empty;
+        }
+
+        protected virtual string GetAnyMethodTranslated(MethodCallExpression m)
+        {
+            if (m.Arguments?.Count != 2)
+                throw new BuilderException("Invalid caller object. It should be a generic collection with one generic parameter");
+
+            if (m.Arguments[0] is not MemberExpression mExp)
+                throw new BuilderException("Invalid caller object. It should be a generic collection with one generic parameter");
+
+            bool isEnumerable = typeof(IEnumerable).IsAssignableFrom(mExp.Type);
+            bool isArray = typeof(Array).IsAssignableFrom(mExp.Type);
+
+            if (!((mExp.Type.IsGenericType && mExp.Type.GenericTypeArguments.Length == 1 && isEnumerable) || isArray))
+                throw new BuilderException("Invalid caller object. It should be a generic collection with one generic parameter");
+
+            if (m.Arguments[1] is not LambdaExpression lExp)
+                throw new BuilderException("Invalid arguments. It should be an expression");
+
+
+            var type = mExp.Type.GenericTypeArguments[0].ToCaseFormat(caseConfig);
+            var parsedExpression = new PostgreSqlConditionTranslator(config, func).Translate(mExp.Type.GenericTypeArguments[0], lExp);
+
+            return string.Format(" EXISTS (SELECT 1 FROM {0}.{1} WHERE {2}) ", config.Scheme, type, parsedExpression);
         }
 
         protected void AppendInStatement<TItem>(IEnumerable<TItem> items, string arg, StringBuilder sb)

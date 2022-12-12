@@ -79,9 +79,38 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
                         if (keyAttrData is null && notMappedAttrData is null)
                         {
-                            var propName = foreignKeyAttrData is null
-                                ? property.Name.ToCaseFormat(caseConfig)
-                                : foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
+                            string propName;
+                            if (foreignKeyAttrData is null)
+                            {
+                                if (property.IsCollection())
+                                {
+                                    var generic = property.GetGenericArg();
+
+                                    if (Constants.StringTypes.Contains(generic!) || Constants.NumericTypes.Contains(generic!))
+                                        propName = property.Name.ToCaseFormat(caseConfig);
+                                    else
+                                        continue;
+                                }
+                                else
+                                    propName = property.Name.ToCaseFormat(caseConfig);
+                            }
+                            else
+                            {
+                                if (property.IsCollection())
+                                {
+                                    var generic = property.GetGenericArg();
+
+                                    if (Constants.StringTypes.Contains(generic!) || Constants.NumericTypes.Contains(generic!))
+                                        throw new BuilderException("Primitive-typed collection should not be marked with foreign key attributes");
+                                    else
+                                    {
+                                        // Handle many to many
+                                        continue;
+                                    }
+                                }
+                                else
+                                    propName = foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
+                            }
 
                             nonNullableProps.Add(string.Format("{0}", propName));
                         }
@@ -95,6 +124,9 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                 var entityData = conditionTranslator.GetPopertyWithValueOfEntity(entity);
                 entityData.ToList().ForEach(pair =>
                 {
+                    if (!nonNullableProps.Contains(pair.Key))
+                        return;
+
                     var value = pair.Value;
                     var parsedValue = value is null
                         ? "NULL" : string.Format(Constants.StringTypes.Contains(value.GetType())
