@@ -779,11 +779,14 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
         protected virtual string GetAnyMethodTranslated(MethodCallExpression m)
         {
-            if (m.Arguments?.Count != 2)
+            if (m?.Arguments is null || m.Arguments?.Count == 0)
                 throw new BuilderException("Invalid caller object. It should be a generic collection with one generic parameter");
 
-            if (m.Arguments[0] is not MemberExpression mExp)
+            if (m.Arguments is null || m.Arguments[0] is not MemberExpression mExp)
                 throw new BuilderException("Invalid caller object. It should be a generic collection with one generic parameter");
+
+            if (m.Arguments is not null && m.Arguments.Count > 2)
+                throw new BuilderException("Invalid amount of arguments");
 
             bool isEnumerable = typeof(IEnumerable).IsAssignableFrom(mExp.Type);
             bool isArray = typeof(Array).IsAssignableFrom(mExp.Type);
@@ -791,14 +794,18 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (!((mExp.Type.IsGenericType && mExp.Type.GenericTypeArguments.Length == 1 && isEnumerable) || isArray))
                 throw new BuilderException("Invalid caller object. It should be a generic collection with one generic parameter");
 
-            if (m.Arguments[1] is not LambdaExpression lExp)
-                throw new BuilderException("Invalid arguments. It should be an expression");
-
-
             var type = mExp.Type.GenericTypeArguments[0].ToCaseFormat(caseConfig);
-            var parsedExpression = new PostgreSqlConditionTranslator(config, func).Translate(mExp.Type.GenericTypeArguments[0], lExp);
 
-            return string.Format(" EXISTS (SELECT 1 FROM {0}.{1} WHERE {2}) ", config.Scheme, type, parsedExpression);
+            if (m.Arguments is not null && m.Arguments.Count == 2)
+            {
+                if (m.Arguments[1] is not LambdaExpression lExp)
+                    throw new BuilderException("Invalid arguments. It should be an expression");
+
+                var parsedExpression = new PostgreSqlConditionTranslator(config, func).Translate(mExp.Type.GenericTypeArguments[0], lExp);
+                return string.Format(" EXISTS (SELECT 1 FROM {0}.{1} WHERE {2} LIMIT 1) ", config.Scheme, type, parsedExpression);
+            }
+
+            return string.Format(" EXISTS (SELECT 1 FROM {0}.{1} LIMIT 1) ", config.Scheme, type);
         }
 
         protected void AppendInStatement<TItem>(IEnumerable<TItem> items, string arg, StringBuilder sb)
