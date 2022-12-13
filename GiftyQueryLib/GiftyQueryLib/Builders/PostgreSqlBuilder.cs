@@ -4,7 +4,7 @@ using GiftyQueryLib.Functions;
 using GiftyQueryLib.Queries.PostgreSQL;
 using System.Linq.Expressions;
 
-namespace GiftyQueryLib.Builders
+namespace GiftyQueryLib.Builders.PostgreSql
 {
     public interface IPostgreSqlBuilder
     {
@@ -43,9 +43,8 @@ namespace GiftyQueryLib.Builders
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="rowSelector">Row to count by</param>
-        /// <param name="distinct">Is selection distinct</param>
         /// <returns></returns>
-        IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null, bool distinct = false) where T : class;
+        IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null) where T : class;
 
         /// <summary>
         /// PostgreSQL Select Query
@@ -53,8 +52,7 @@ namespace GiftyQueryLib.Builders
         /// <typeparam name="T"></typeparam>
         /// <param name="include">Columns to include into selection</param>
         /// <param name="exclude">Columns to exclude from selection</param>
-        /// <param name="distinct">Is selection distinct</param>
-        public IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false) where T : class;
+        public IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class;
 
         /// <summary>
         /// PostgreSQL Insert Query
@@ -208,11 +206,10 @@ namespace GiftyQueryLib.Builders
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="rowSelector">Row to count by</param>
-        /// <param name="distinct">Is selection distinct</param>
         /// <returns></returns>
-        public IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null, bool distinct = false) where T : class
+        public IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Count(rowSelector, distinct);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Count(rowSelector);
         }
 
         /// <summary>
@@ -221,10 +218,9 @@ namespace GiftyQueryLib.Builders
         /// <typeparam name="T"></typeparam>
         /// <param name="include">Columns to include into selection</param>
         /// <param name="exclude">Columns to exclude from selection</param>
-        /// <param name="distinct">Is selection distinct</param>
-        public virtual IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false) where T : class
+        public virtual IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Select(include, exclude, distinct);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Select(include, exclude);
         }
 
         /// <summary>
@@ -322,4 +318,18 @@ namespace GiftyQueryLib.Builders
 
         #endregion
     }
+
+    #region Enums
+
+    public enum JoinType
+    {
+        Inner, Left, Right, Full, Cross
+    }
+
+    public enum SelectType
+    {
+        All, Distinct
+    }
+
+    #endregion
 }

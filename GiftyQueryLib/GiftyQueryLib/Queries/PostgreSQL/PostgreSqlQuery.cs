@@ -1,4 +1,6 @@
-﻿using GiftyQueryLib.Config;
+﻿using GiftyQueryLib.Builders;
+using GiftyQueryLib.Builders.PostgreSql;
+using GiftyQueryLib.Config;
 using GiftyQueryLib.Enums;
 using GiftyQueryLib.Exceptions;
 using GiftyQueryLib.Functions;
@@ -38,10 +40,9 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             return new PostgreSqlQuery<T>(new PostgreSqlConditionTranslator(config, func), config);
         }
 
-        public virtual IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null, bool distinct = false)
+        public virtual IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null)
         {
             string sql = "SELECT ";
-            string sqlDistinct = distinct ? "DISTINCT " : string.Empty;
             string sqlCount = "COUNT({0}) ";
             string? name;
 
@@ -63,21 +64,21 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
             sqlCount = string.Format(sqlCount + " AS {0} ", $"count_{name}");
 
-            value = new StringBuilder(sql + sqlDistinct + sqlCount);
+            value = new StringBuilder(sql + sqlCount);
 
             return this;
         }
 
-        public virtual IJoinNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false)
+        public virtual IJoinNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null)
         {
             string sql = "SELECT ";
-            string sqlDistinct = distinct ? "DISTINCT " : string.Empty;
 
             SelectorData parsedSelector = conditionTranslator.ParseAnonymousSelector(include, exclude);
 
             selectAllIsUsed = parsedSelector.ExtraData?.IsSelectAll;
             exceptRowSelector = exclude;
 
+            string sqlDistinct = parsedSelector.ExtraData?.IsDistinct ? "DISTINCT " : string.Empty;
             string sqlRows = parsedSelector.Result! + (selectAllIsUsed ? "{0}" : "");
             string sqlFrom = string.Format(" FROM {0}.{1} ", config.Scheme, typeof(T).ToCaseFormat(caseConfig));
 
@@ -370,7 +371,13 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         public IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null)
         {
             groupByIsUsed = true;
-            var parsed = conditionTranslator.ParseAnonymousSelector(include, exclude, null, true, false, false, true, false);
+
+            var parsed = conditionTranslator.ParseAnonymousSelector(include, exclude, config: new SelectorConfig
+            {
+                AllowMethodCall = false,
+                AllowBinary = false,
+                UseAliases = false
+            });
             value.AppendFormat("GROUP BY {0} ", parsed.Result);
 
             return this;
@@ -390,7 +397,11 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             if (rowSelector is null)
                 throw new BuilderException("Row selector must be provided");
 
-            var parsed = conditionTranslator.ParseAnonymousSelector(rowSelector, null, null, true, true, false, false, false);
+            var parsed = conditionTranslator.ParseAnonymousSelector(rowSelector, config: new SelectorConfig
+            {
+                AllowBinary = false,
+                AllowConstant = false
+            });
 
             var orderRowsSql = string.Join(',', parsed.Result!.Split(',').Select(it => it + " " + orderType.ToString().ToUpper()));
             value.AppendFormat("ORDER BY {0} ", orderRowsSql);

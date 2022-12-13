@@ -1,4 +1,5 @@
-﻿using GiftyQueryLib.Enums;
+﻿using GiftyQueryLib.Builders.PostgreSql;
+using GiftyQueryLib.Enums;
 using System.Linq.Expressions;
 
 namespace GiftyQueryLib.Queries.PostgreSQL
@@ -56,9 +57,9 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
     public interface IInstructionNode<T> : IQueryStringBuilder where T : class
     {
-        IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null, bool distinct = false);
+        IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null);
 
-        IJoinNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool distinct = false);
+        IJoinNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null);
 
         IQueryStringBuilder Insert(params T[] entities);
 

@@ -1,4 +1,5 @@
-﻿using GiftyQueryLib.Translators.Models;
+﻿using GiftyQueryLib.Exceptions;
+using GiftyQueryLib.Translators.Models;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -36,17 +37,12 @@ namespace GiftyQueryLib.Translators
         /// <param name="anonymusSelector">The selector of anonymus type</param>
         /// <param name="exceptSelector">The selector to exclude params. Only works if anonymus selector has "All" claim</param>
         /// <param name="extraType">Extra Type</param>
-        /// <param name="useAliases">Determine if use aliases for columns or not</param>
-        /// <returns>Member Data Collection</returns>
+        /// <param name="config">Selector Config</param>
+        /// <returns>Selector Data</returns>
         public abstract SelectorData ParseAnonymousSelector<TItem>(
             Expression<Func<TItem, object>>? anonymusSelector, 
             Expression<Func<TItem, object>>? exceptSelector = null, 
-            Type? extraType = null,
-             bool allowMemberExpression = true,
-            bool allowMethodCallExpression = true,
-            bool allowBinaryExpression = true,
-            bool allowConstantExpression = true,
-            bool useAliases = true) where TItem : class;
+            Type? extraType = null, SelectorConfig? config = null) where TItem : class;
 
         /// <summary>
         /// Converts an Expression statement into other language statement string
@@ -70,7 +66,7 @@ namespace GiftyQueryLib.Translators
             var body = propertySelector?.Body;
 
             if (body is null)
-                throw new ArgumentException($"The row selector is null");
+                throw new BuilderException("The row selector is null");
 
             if (body is MemberExpression memberExpression)
             {
@@ -83,9 +79,14 @@ namespace GiftyQueryLib.Translators
             }
             else if (body is UnaryExpression unaryExpression)
             {
-                var memberInfo = unaryExpression.Operand is MethodCallExpression methodExpression
-                    ? methodExpression.Method
-                    : ((MemberExpression)unaryExpression.Operand).Member;
+                MemberInfo? memberInfo;
+
+                if (unaryExpression.Operand is MethodCallExpression mcExp)
+                    memberInfo = mcExp.Method;
+                else if (unaryExpression.Operand is MemberExpression mExp)
+                    memberInfo = mExp.Member;
+                else
+                    throw new BuilderException("Invalid operand expression");
 
                 return new MemberData
                 {
@@ -95,22 +96,7 @@ namespace GiftyQueryLib.Translators
                 };
             }
             else
-                throw new ArgumentException($"Invalid expression was provided");
-        }
-
-        /// <summary>
-        ///  Gets Operand From Expression
-        /// </summary>
-        /// <param name="exp">Expression</param>
-        /// <returns></returns>
-        public string GetOperandFromExpression<TInput>(Expression<Func<TInput, object>>? exp) where TInput : class
-        {
-            if (exp is not null && exp.Body is UnaryExpression uExp && uExp.NodeType == ExpressionType.Convert)
-            {
-                return (uExp.Operand as ConstantExpression)!.Value!.ToString()!;
-            }
-
-            return string.Empty;
+                throw new BuilderException($"Invalid expression was provided");
         }
 
         /// <summary>

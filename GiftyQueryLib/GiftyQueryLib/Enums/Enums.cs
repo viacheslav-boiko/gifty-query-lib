@@ -11,18 +11,13 @@
         Snake, Camel, Custom
     }
 
+    /// <summary>
+    /// Order dirction for sorting<br/>
+    /// <b>Asc</b> - Ascending<br/>
+    /// <b>Desc</b> - Descending<br/>
+    /// </summary>
     public enum OrderType
     {
         Asc, Desc
-    }
-
-    public enum JoinType
-    {
-        Inner, Left, Right, Full, Cross
-    }
-
-    public enum SelectType
-    {
-        All
     }
 }
