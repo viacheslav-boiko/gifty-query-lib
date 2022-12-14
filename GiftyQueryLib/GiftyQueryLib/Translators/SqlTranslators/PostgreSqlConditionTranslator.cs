@@ -634,7 +634,9 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         protected virtual string GetContainsMethodTranslated(MethodCallExpression m)
         {
             var sb = new StringBuilder();
-            string arg = string.Empty;
+            var arg = string.Empty;
+            var argNullable = false;
+
             Expression? expObj = null;
 
             if (m.Arguments.Count == 1)
@@ -660,7 +662,20 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 }
                 else if (m.Arguments[0] is MemberExpression mArg)
                 {
+                    if (mArg?.Member is null)
+                        throw new BuilderException("Member expression should not be null");
+
                     arg = mArg.Member.Name;
+                    argNullable = Nullable.GetUnderlyingType((mArg.Member as PropertyInfo).PropertyType) != null;
+                    expObj = m.Object;
+                }
+                else if (m.Arguments[0] is UnaryExpression uArg && uArg.Operand is MemberExpression umExp)
+                {
+                    if (umExp?.Member is null)
+                        throw new BuilderException("Member expression should not be null");
+
+                    arg = umExp.Member.Name;
+                    argNullable = Nullable.GetUnderlyingType((umExp.Member as PropertyInfo).PropertyType) != null;
                     expObj = m.Object;
                 }
                 else
@@ -721,38 +736,34 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if ((obj.Type.IsGenericType && obj.Type.GenericTypeArguments.Length == 1 && isEnumerable) || isArray)
             {
                 var genericArg = isArray ? obj.Type : obj.Type.GenericTypeArguments[0];
-
-                object? val = obj.Value;
+                var val = obj.Value;
 
                 if (val is null)
                     throw new BuilderException("Object value should not be null");
 
-                bool result = false;
-                result = PerformTypeBasedEnum<string>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<char>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<Guid>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<DateTime>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<TimeSpan>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<int>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<short>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<ushort>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<uint>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<float>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<double>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<long>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<ulong>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<byte>(genericArg, val, arg, result, sb);
-                result = PerformTypeBasedEnum<decimal>(genericArg, val, arg, result, sb);
+                var collection = (IEnumerable)val;
+                var collectionSb = new StringBuilder();
+                var isNumeric = Constants.NumericTypes.Contains(genericArg);
+                var isString = !isNumeric && Constants.StringTypes.Contains(genericArg);
 
-                if (!result)
-                    throw new BuilderException($"Unsupported type {genericArg?.Name}");
+                if (!isNumeric && !isString)
+                    throw new BuilderException($"Invalid type {genericArg.Name} of collection");
 
-                return sb.ToString();
+                foreach (var item in collection)
+                {
+                    // TODO: Create a map with default values for types
+                    var value = item is null ? (argNullable ? "NULL" : (isNumeric ? "0" : "''")) : (isString ? $"'{item}'" : item.ToString());
+                    collectionSb.Append(value + ", ");
+                }
+
+                string result = string.Format(" " + config.ColumnAccessFormat + " IN ({3})",
+                    config.Scheme, type?.ToCaseFormat(caseConfig),
+                    arg.ToCaseFormat(caseConfig), collectionSb.TrimEndComma());
+
+                return result;
             }
             else
-            {
                 throw new BuilderException($"Unsupported type {obj.Type}");
-            }
         }
 
         protected virtual string GetUpperLowerMethodTranslated(MethodCallExpression m, bool isLower)
@@ -822,17 +833,6 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             return string.Format(" EXISTS (SELECT 1 FROM {0}.{1} LIMIT 1) ", config.Scheme, type);
         }
 
-        protected void AppendInStatement<TItem>(IEnumerable<TItem> items, string arg, StringBuilder sb)
-        {
-            if (items is not null && items.Any())
-            {
-                if (Constants.StringTypes.Contains(typeof(TItem)))
-                    sb.Append(string.Format(" " + config.ColumnAccessFormat + " IN ({3}) ", config.Scheme, type?.ToCaseFormat(caseConfig), arg.ToCaseFormat(caseConfig), string.Join(',', items.Select(it => $"'{it}'"))));
-                else
-                    sb.Append(string.Format(" " + config.ColumnAccessFormat + " IN ({3}) ", config.Scheme, type?.ToCaseFormat(caseConfig), arg.ToCaseFormat(caseConfig), string.Join(',', items)));
-            }
-        }
-
         protected static string ConvertToItemWithType(object? item)
         {
             if (item is null)
@@ -842,20 +842,6 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 return string.Format("'{0}'", item.ToString());
             else
                 return string.Format("{0}", item.ToString());
-        }
-
-        protected bool PerformTypeBasedEnum<TItem>(Type genericType, object valueToCast, string expressionType, bool result, StringBuilder sb)
-        {
-            if (result)
-                return true;
-
-            if (genericType == typeof(TItem) || genericType == typeof(TItem[]))
-            {
-                AppendInStatement((IEnumerable<TItem>)valueToCast, expressionType, sb);
-                return true;
-            }
-
-            return false;
         }
     }
 }

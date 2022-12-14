@@ -18,8 +18,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         protected StringBuilder value = new(string.Empty);
 
         protected bool whereIsUsed = false;
-        protected bool selectAllIsUsed = false;
-        protected bool groupByIsUsed = false;
+        protected string selectAllMark = string.Empty;
 
         protected Expression<Func<T, object>>? exceptRowSelector = null;
 
@@ -306,8 +305,8 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         public virtual string Build()
         {
             string str = value.ToString();
-            if (selectAllIsUsed || exceptRowSelector is not null)
-                str = string.Format(str, string.Empty);
+            if (!string.IsNullOrEmpty(selectAllMark) || exceptRowSelector is not null)
+                str = str.Replace(selectAllMark, string.Empty);
 
             return str;
         }
@@ -344,12 +343,12 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         {
             string sql = "SELECT ";
 
-            selectAllIsUsed = selectAll;
+            selectAllMark = selectAll ? $"<s_a_{Guid.NewGuid()}>" : string.Empty;
 
             var parsedSelector = conditionTranslator.ParseAnonymousSelector(include, exclude, config: new SelectorConfig { SelectAll = selectAll });
 
             string sqlDistinct = distinct ? "DISTINCT " : "";
-            string sqlRows = parsedSelector.Result! + (selectAllIsUsed ? "{0}" : "");
+            string sqlRows = parsedSelector.Result! + (selectAll ? selectAllMark : "");
             string sqlFrom = string.Format(" FROM {0}.{1} ", config.Scheme, typeof(T).ToCaseFormat(caseConfig));
 
             value = new StringBuilder(sql + sqlDistinct + sqlRows + sqlFrom);
@@ -390,17 +389,15 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
             value.AppendFormat("{0} JOIN {1}.{2} ON {3} = {4} ", sqlJoinType, config.Scheme, memberTypeName, foreignKeyName, inner);
 
-            if (selectAllIsUsed)
+            if (!string.IsNullOrEmpty(selectAllMark))
             {
-                string sqlRows = "," + conditionTranslator.ParseAnonymousSelector(null, exceptRowSelector, memberType, new SelectorConfig { SelectAll = true }).Result! + "{0}";
-                value = new StringBuilder(string.Format(value.ToString(), sqlRows));
+                string sqlRows = "," + conditionTranslator.ParseAnonymousSelector(null, exceptRowSelector, memberType, new SelectorConfig { SelectAll = true }).Result! + selectAllMark;
+                value = new StringBuilder(value.ToString().Replace(selectAllMark, sqlRows));
             }
         }
 
         public IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null)
         {
-            groupByIsUsed = true;
-
             var parsed = conditionTranslator.ParseAnonymousSelector(include, exclude, config: new SelectorConfig
             {
                 AllowMethodCall = false,
@@ -414,9 +411,6 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         public IOrderNode<T> Having(Expression<Func<T, bool>> condition)
         {
-            // TODO: Check if we need this check
-            //if (!groupByIsUsed)
-            //    throw new BuilderException("Group by unique value must be used with having statement");
             value.AppendFormat("HAVING {0} ", conditionTranslator.Translate<T>(condition));
             return this;
         }
