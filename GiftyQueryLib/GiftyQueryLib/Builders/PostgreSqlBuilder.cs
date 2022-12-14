@@ -47,12 +47,44 @@ namespace GiftyQueryLib.Builders.PostgreSql
         IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null) where T : class;
 
         /// <summary>
+        /// PostgreSQL Select Distinct Count Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="rowSelector">Row to count by</param>
+        /// <returns></returns>
+        IJoinNode<T> CountDistinct<T>(Expression<Func<T, object>>? rowSelector = null) where T : class;
+
+        /// <summary>
         /// PostgreSQL Select Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="include">Columns to include into selection</param>
+        public IJoinNode<T> Select<T>(Expression<Func<T, object>> include) where T : class;
+
+        /// <summary>
+        /// PostgreSQL Select Distinct Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="include">Columns to include into selection</param>
+        public IJoinNode<T> SelectDistinct<T>(Expression<Func<T, object>> include) where T : class;
+
+        /// <summary>
+        /// PostgreSQL Select All Entity Properties Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="include">Columns to include into selection</param>
         /// <param name="exclude">Columns to exclude from selection</param>
-        public IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class;
+        /// <returns></returns>
+        public IJoinNode<T> SelectAll<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class;
+
+        /// <summary>
+        /// PostgreSQL Select Distinct All Entity Properties Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="include">Columns to include into selection</param>
+        /// <param name="exclude">Columns to exclude from selection</param>
+        /// <returns></returns>
+        public IJoinNode<T> SelectDistinctAll<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class;
 
         /// <summary>
         /// PostgreSQL Insert Query
@@ -135,6 +167,12 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public double Alias();
 
+        /// <summary>
+        /// Transforms into <b>DISTINCT ON (coumn_name) column_name_alias</b> sql expression
+        /// </summary>
+        /// <returns></returns>
+        public string Distinct(object _);
+
         #endregion
 
         /// <summary>
@@ -213,14 +251,58 @@ namespace GiftyQueryLib.Builders.PostgreSql
         }
 
         /// <summary>
+        /// PostgreSQL Select Distinct Count Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="rowSelector">Row to count by</param>
+        /// <returns></returns>
+        public IJoinNode<T> CountDistinct<T>(Expression<Func<T, object>>? rowSelector = null) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(Config, Func).CountDistinct(rowSelector);
+        }
+
+        /// <summary>
         /// PostgreSQL Select Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="include">Columns to include into selection</param>
-        /// <param name="exclude">Columns to exclude from selection</param>
-        public virtual IJoinNode<T> Select<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class
+        public virtual IJoinNode<T> Select<T>(Expression<Func<T, object>> include) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Select(include, exclude);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Select(include);
+        }
+
+        /// <summary>
+        /// PostgreSQL Select Distinct Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="include">Columns to include into selection</param>
+        public IJoinNode<T> SelectDistinct<T>(Expression<Func<T, object>> include) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(Config, Func).SelectDistinct(include);
+        }
+
+        /// <summary>
+        /// PostgreSQL Select All Entity Properties Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="include">Columns to include into selection</param>
+        /// <param name="exclude">Columns to exclude from selection</param>
+        /// <returns></returns>
+        public IJoinNode<T> SelectAll<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(Config, Func).SelectAll(include, exclude);
+        }
+
+        /// <summary>
+        /// PostgreSQL Select Distinct All Entity Properties Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="include">Columns to include into selection</param>
+        /// <param name="exclude">Columns to exclude from selection</param>
+        /// <returns></returns>
+        public IJoinNode<T> SelectDistinctAll<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(Config, Func).SelectDistinctAll(include, exclude);
         }
 
         /// <summary>
@@ -316,6 +398,13 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public double Alias() => default;
 
+        /// <summary>
+        /// Transforms into <b>DISTINCT ON (coumn_name) column_name_alias</b> sql expression
+        /// </summary>
+        /// <returns></returns>
+        public string Distinct(object _) => default!;
+
+
         #endregion
     }
 
@@ -324,11 +413,6 @@ namespace GiftyQueryLib.Builders.PostgreSql
     public enum JoinType
     {
         Inner, Left, Right, Full, Cross
-    }
-
-    public enum SelectType
-    {
-        All, Distinct
     }
 
     #endregion

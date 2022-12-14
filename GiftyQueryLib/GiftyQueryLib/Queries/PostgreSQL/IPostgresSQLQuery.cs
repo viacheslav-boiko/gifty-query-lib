@@ -59,7 +59,15 @@ namespace GiftyQueryLib.Queries.PostgreSQL
     {
         IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null);
 
-        IJoinNode<T> Select(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null);
+        IJoinNode<T> CountDistinct(Expression<Func<T, object>>? rowSelector = null);
+
+        IJoinNode<T> Select(Expression<Func<T, object>> include);
+
+        IJoinNode<T> SelectDistinct(Expression<Func<T, object>> include);
+
+        IJoinNode<T> SelectAll(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null);
+
+        IJoinNode<T> SelectDistinctAll(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null);
 
         IQueryStringBuilder Insert(params T[] entities);
 

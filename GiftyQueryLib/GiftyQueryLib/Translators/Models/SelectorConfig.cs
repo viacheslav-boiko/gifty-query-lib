@@ -2,6 +2,7 @@
 {
     public class SelectorConfig
     {
+        public bool SelectAll { get; init; } = false;
         public bool AllowMember { get; init; } = true;
         public bool AllowMethodCall { get; init; } = true;
         public bool AllowBinary { get; init; } = true;

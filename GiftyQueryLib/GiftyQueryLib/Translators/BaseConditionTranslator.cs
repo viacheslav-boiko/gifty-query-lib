@@ -40,8 +40,8 @@ namespace GiftyQueryLib.Translators
         /// <param name="config">Selector Config</param>
         /// <returns>Selector Data</returns>
         public abstract SelectorData ParseAnonymousSelector<TItem>(
-            Expression<Func<TItem, object>>? anonymusSelector, 
-            Expression<Func<TItem, object>>? exceptSelector = null, 
+            Expression<Func<TItem, object>>? anonymusSelector,
+            Expression<Func<TItem, object>>? exceptSelector = null,
             Type? extraType = null, SelectorConfig? config = null) where TItem : class;
 
         /// <summary>

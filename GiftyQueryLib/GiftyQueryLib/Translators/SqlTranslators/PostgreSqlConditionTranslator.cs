@@ -1,11 +1,9 @@
-﻿using GiftyQueryLib.Builders.PostgreSql;
-using GiftyQueryLib.Config;
+﻿using GiftyQueryLib.Config;
 using GiftyQueryLib.Exceptions;
 using GiftyQueryLib.Functions;
 using GiftyQueryLib.Translators.Models;
 using GiftyQueryLib.Utils;
 using System.Collections;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -157,35 +155,24 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             Expression<Func<TItem, object>>? exceptSelector = null,
             Type? extraType = null, SelectorConfig? config = null) where TItem : class
         {
-            if (anonymusSelector is null)
-            {
-                return new SelectorData
-                {
-                    Result = ParsePropertiesOfType(exceptSelector, extraType),
-                    ExtraData = new
-                    {
-                        IsSelectAll = true,
-                        IsDistinct = false
-                    }
-                };
-            }
 
-            var body = anonymusSelector.Body;
-            var isSelectAll = false;
-            var isDistinct = false;
+            var body = anonymusSelector?.Body;
 
             config ??= new SelectorConfig();
 
-            if (body is null)
+            if (body is null && !config.SelectAll)
                 throw new BuilderException("The anonymus selector cannot be null");
+
+            var sb = new StringBuilder();
+
+            if (config.SelectAll)
+                sb.Append(ParsePropertiesOfType(exceptSelector, extraType));
 
             if (body is NewExpression newExpression && newExpression.Type.Name.Contains("Anonymous"))
             {
                 type = typeof(TItem);
 
                 int i = 0;
-
-                var sb = new StringBuilder();
 
                 foreach (var exp in newExpression.Arguments)
                 {
@@ -215,38 +202,16 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     {
                         if (!config.AllowConstant)
                             throw new BuilderException("Anonymous selector has not allowed expressions that could be parsed");
-
-                        if (!isSelectAll && cExp.Value?.ToString() == SelectType.All.ToString())
-                        {
-                            isSelectAll = true;
-                            sb.Append(ParsePropertiesOfType(exceptSelector, extraType));
-                        }
-                        
-                        if (!isDistinct && cExp.Value?.ToString() == SelectType.Distinct.ToString())
-                        {
-                            isDistinct = true;
-                        }
                     }
 
                     i++;
                 }
-
-                string result = sb.ToString();
-                if (result.EndsWith(','))
-                    result = result.Remove(result.Length - 1, 1);
-
-                return new SelectorData 
-                { 
-                    Result = result, 
-                    ExtraData = new 
-                    { 
-                        IsSelectAll = isSelectAll,
-                        IsDistinct = isDistinct,
-                    } 
-                };
             }
 
-            throw new BuilderException($"Invalid expression was provided");
+            return new SelectorData
+            {
+                Result = sb.TrimEndComma()
+            };
         }
 
         /// <summary>
@@ -290,8 +255,8 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     continue;
 
                 sb.Append(foreignKeyAttrData is not null
-                    ? string.Format(config.ColumnAccessFormat + ",", config.Scheme, type.ToCaseFormat(caseConfig), foreignKeyAttrData.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat(caseConfig))
-                    : string.Format(config.ColumnAccessFormat + ",", config.Scheme, type.ToCaseFormat(caseConfig), property.Name.ToCaseFormat(caseConfig)));
+                    ? string.Format(config.ColumnAccessFormat + ", ", config.Scheme, type.ToCaseFormat(caseConfig), foreignKeyAttrData.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat(caseConfig))
+                    : string.Format(config.ColumnAccessFormat + ", ", config.Scheme, type.ToCaseFormat(caseConfig), property.Name.ToCaseFormat(caseConfig)));
             }
 
             var parsed = sb.ToString();
@@ -316,13 +281,13 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 var result = string.Format(config.ColumnAccessFormat, config.Scheme, memberExp.Expression?.Type.ToCaseFormat(caseConfig), memberName);
 
                 if (paramName is null || memberExp.Member.Name.ToCaseFormat(caseConfig) == paramName)
-                    return result + ",";
+                    return result + ", ";
                 else
                 {
                     if (!aliases.TryAdd(paramName, result))
                         throw new BuilderException($"Alias \"{paramName}\" already exists");
 
-                    return string.Format(result + " AS {0},", paramName);
+                    return string.Format(result + " AS {0}, ", paramName);
                 }
             }
 
@@ -431,12 +396,12 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                         var result = string.Format(func.Functions[methodName].value, string.Join(',', columns));
 
                         if (paramName is null)
-                            return result + ",";
+                            return result + ", ";
 
                         if (!aliases.TryAdd(paramName, result))
                             throw new BuilderException($"Alias \"{paramName}\" already exists");
 
-                        return result + (paramName is null ? "" : " AS " + paramName) + ",";
+                        return result + (paramName is null ? "" : " AS " + paramName) + ", ";
                     }
                 }
             }
@@ -486,29 +451,32 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 var result = string.Format(format, config.Scheme, type?.ToCaseFormat(caseConfig), memberName);
 
+                if (methodName == "Distinct")
+                    result += string.Format(" " + config.ColumnAccessFormat, config.Scheme, type?.ToCaseFormat(caseConfig), memberName);
+
                 if (paramName is null)
-                    sb.Append(result + ",");
+                    sb.Append(result + ", ");
                 else
                 {
                     if (!aliases.TryAdd(paramName, result))
                         throw new BuilderException($"Alias \"{paramName}\" already exists");
 
-                    sb.Append(result + $" AS {paramName},");
+                    sb.Append(result + $" AS {paramName}, ");
                 }
             }
             else
             {
-                if (CheckIfMethodExists(methodName, func.Functions!))
+                if (CheckIfMethodExists(methodName, func.Functions!) && methodName != "Distinct")
                 {
                     string result = string.Format(func.Functions[methodName].value, translatedInnerExpression);
 
                     if (paramName is null)
-                        sb.Append(result + ",");
+                        sb.Append(result + ", ");
                     else
                     {
                         if (!aliases.TryAdd(paramName, result))
                             throw new BuilderException($"Alias \"{paramName}\" already exists");
-                        sb.Append(result + $" AS {paramName},");
+                        sb.Append(result + $" AS {paramName}, ");
                     }
                 }
             }
@@ -531,12 +499,12 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             string translatedBinary = translator.Translate(type!, bExp);
 
             if (paramName is null)
-                return translatedBinary + ",";
+                return translatedBinary + ", ";
             else
             {
                 if (!aliases.TryAdd(paramName, translatedBinary))
                     throw new BuilderException($"Alias \"{paramName}\" already exists");
-                return string.Format("{0} AS {1},", translatedBinary, paramName);
+                return string.Format("{0} AS {1}, ", translatedBinary, paramName);
             }
         }
 
@@ -640,11 +608,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
             if (func.Functions.ContainsKey(m.Method.Name))
             {
-                string parsed = ParseMethodCallExpression(m);
-
-                if (parsed.EndsWith(','))
-                    parsed = parsed.Remove(parsed.Length - 1, 1);
-
+                string parsed = ParseMethodCallExpression(m).TrimEndComma();
                 sb.Append(parsed);
                 return m;
             }

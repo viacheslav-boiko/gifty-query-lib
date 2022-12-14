@@ -12,7 +12,7 @@ namespace GiftyQueryLib.Functions
         /// Get Instance of PostgreSqlFunctions class
         /// </summary>
         public static PostgreSqlFunctions Instance => instance ??= new PostgreSqlFunctions();
-        
+
         #region Dictionaries
 
         /// <summary>
@@ -51,7 +51,8 @@ namespace GiftyQueryLib.Functions
             { "Min", ("MIN({0})", Constants.NumericTypes) },
             { "Max", ("MAX({0})", Constants.NumericTypes) },
             { "Concat", ("CONCAT({0})", null) },
-            { "Alias", ("", null) }
+            { "Alias", ("", null) },
+            { "Distinct", ("DISTINCT ON ({0})", null) }
         };
 
         #endregion
