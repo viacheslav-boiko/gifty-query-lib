@@ -42,17 +42,17 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// PostgreSQL Select Count Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="rowSelector">Row to count by</param>
+        /// <param name="columnSelector">Column to count by</param>
         /// <returns></returns>
-        IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null) where T : class;
+        public IJoinNode<T> Count<T>(Expression<Func<T, object>>? columnSelector = null) where T : class;
 
         /// <summary>
         /// PostgreSQL Select Distinct Count Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="rowSelector">Row to count by</param>
+        /// <param name="columnSelector">Column to count by</param>
         /// <returns></returns>
-        IJoinNode<T> CountDistinct<T>(Expression<Func<T, object>>? rowSelector = null) where T : class;
+        public IJoinNode<T> CountDistinct<T>(Expression<Func<T, object>>? columnSelector = null) where T : class;
 
         /// <summary>
         /// PostgreSQL Select Query
@@ -60,6 +60,14 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <typeparam name="T"></typeparam>
         /// <param name="include">Columns to include into selection</param>
         public IJoinNode<T> Select<T>(Expression<Func<T, object>> include) where T : class;
+
+        /// <summary>
+        /// PostgreSQL Select Single Column Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="columnSelector">Column to select</param>
+        /// <returns></returns>
+        public IJoinNode<T> SelectSingle<T>(Expression<Func<T, object>>? columnSelector = null) where T : class;
 
         /// <summary>
         /// PostgreSQL Select Distinct Query
@@ -173,6 +181,14 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public string Distinct(object _);
 
+        /// <summary>
+        /// Transforms into <b>EXISTS(expression)</b> sql subquery
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="predicate"></param>
+        /// <returns></returns>
+        public bool Exists<T>(Expression<Func<T, bool>> predicate);
+
         #endregion
 
         /// <summary>
@@ -243,22 +259,22 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// PostgreSQL Select Count Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="rowSelector">Row to count by</param>
+        /// <param name="columnSelector">Column to count by</param>
         /// <returns></returns>
-        public IJoinNode<T> Count<T>(Expression<Func<T, object>>? rowSelector = null) where T : class
+        public IJoinNode<T> Count<T>(Expression<Func<T, object>>? columnSelector = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Count(rowSelector);
+            return PostgreSqlQuery<T>.Flow(Config, Func).Count(columnSelector);
         }
 
         /// <summary>
         /// PostgreSQL Select Distinct Count Query
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="rowSelector">Row to count by</param>
+        /// <param name="columnSelector">Column to count by</param>
         /// <returns></returns>
-        public IJoinNode<T> CountDistinct<T>(Expression<Func<T, object>>? rowSelector = null) where T : class
+        public IJoinNode<T> CountDistinct<T>(Expression<Func<T, object>>? columnSelector = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).CountDistinct(rowSelector);
+            return PostgreSqlQuery<T>.Flow(Config, Func).CountDistinct(columnSelector);
         }
 
         /// <summary>
@@ -269,6 +285,17 @@ namespace GiftyQueryLib.Builders.PostgreSql
         public virtual IJoinNode<T> Select<T>(Expression<Func<T, object>> include) where T : class
         {
             return PostgreSqlQuery<T>.Flow(Config, Func).Select(include);
+        }
+
+        /// <summary>
+        /// PostgreSQL Select Single Column Query
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="columnSelector">Column to select</param>
+        /// <returns></returns>
+        public IJoinNode<T> SelectSingle<T>(Expression<Func<T, object>>? columnSelector = null) where T : class
+        {
+            return PostgreSqlQuery<T>.Flow(Config, Func).SelectSingle(columnSelector);
         }
 
         /// <summary>
@@ -403,6 +430,19 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// </summary>
         /// <returns></returns>
         public string Distinct(object _) => default!;
+
+        /// <summary>
+        /// Transforms into <b>EXISTS(expression)</b> sql subquery
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="predicate"></param>
+        /// <returns></returns>
+        public bool Exists<T>(Expression<Func<T, bool>> predicate) => default;
+
+        #endregion
+
+        #region Dynamic
+
 
 
         #endregion

@@ -9,6 +9,7 @@ using GiftyQueryLib.Utils;
 using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
 using System.Text;
+using System.Xml.Linq;
 
 namespace GiftyQueryLib.Queries.PostgreSQL
 {
@@ -20,7 +21,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         protected bool whereIsUsed = false;
         protected string selectAllMark = string.Empty;
 
-        protected Expression<Func<T, object>>? exceptRowSelector = null;
+        protected Expression<Func<T, object>>? exceptColumnSelector = null;
 
         private readonly PostgreSqlConditionTranslator conditionTranslator;
         private readonly PostgreSqlConfig config;
@@ -38,16 +39,16 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             return new PostgreSqlQuery<T>(new PostgreSqlConditionTranslator(config, func), config);
         }
 
-        public virtual IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null)
+        public virtual IJoinNode<T> Count(Expression<Func<T, object>>? columnSelector = null)
         {
-            ParseCountExpression(rowSelector);
+            ParseCountExpression(columnSelector);
 
             return this;
         }
 
-        public IJoinNode<T> CountDistinct(Expression<Func<T, object>>? rowSelector = null)
+        public IJoinNode<T> CountDistinct(Expression<Func<T, object>>? columnSelector = null)
         {
-            ParseCountExpression(rowSelector, true);
+            ParseCountExpression(columnSelector, true);
 
             return this;
         }
@@ -55,6 +56,20 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         public virtual IJoinNode<T> Select(Expression<Func<T, object>> include)
         {
             ParseSelectExpression(include);
+
+            return this;
+        }
+
+        public IJoinNode<T> SelectSingle(Expression<Func<T, object>>? columnSelector = null)
+        {
+            ParseSelectSingleExpression(columnSelector); 
+            
+            return this;
+        }
+
+        public IJoinNode<T> SelectDistinctSingle(Expression<Func<T, object>>? columnSelector = null)
+        {
+            ParseSelectSingleExpression(columnSelector, true);
 
             return this;
         }
@@ -305,22 +320,22 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         public virtual string Build()
         {
             string str = value.ToString();
-            if (!string.IsNullOrEmpty(selectAllMark) || exceptRowSelector is not null)
+            if (!string.IsNullOrEmpty(selectAllMark) || exceptColumnSelector is not null)
                 str = str.Replace(selectAllMark, string.Empty);
 
             return str;
         }
 
-        private void ParseCountExpression(Expression<Func<T, object>>? rowSelector = null, bool distinct = false)
+        private void ParseCountExpression(Expression<Func<T, object>>? columnSelector = null, bool distinct = false)
         {
             string sql = "SELECT ";
             string sqlDistinct = distinct ? "DISTINCT " : "";
             string sqlCount = "COUNT({0}) ";
             string? name;
 
-            if (rowSelector is not null)
+            if (columnSelector is not null)
             {
-                var data = conditionTranslator.GetMemberData(rowSelector);
+                var data = conditionTranslator.GetMemberData(columnSelector);
                 var info = data.MemberInfo;
                 var type = data.CallerType?.ToCaseFormat(caseConfig);
                 name = info?.Name?.ToCaseFormat(caseConfig);
@@ -337,6 +352,26 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             sqlCount = string.Format(sqlCount + " AS {0} ", $"count_{name}");
 
             value = new StringBuilder(sql + sqlDistinct + sqlCount);
+        }
+
+        private void ParseSelectSingleExpression(Expression<Func<T, object>>? columnSelector = null, bool distinct = false)
+        {
+            string sql = "SELECT ";
+            string sqlDistinct = distinct ? "DISTINCT " : "";
+
+            if (columnSelector is null)
+            {
+                value = new StringBuilder(sql + sqlDistinct + "1 ");
+            }
+            else
+            {
+                var data = conditionTranslator.GetMemberData(columnSelector);
+                var info = data.MemberInfo;
+                var type = data.CallerType?.ToCaseFormat(caseConfig);
+                var name = info?.Name?.ToCaseFormat(caseConfig);
+
+                value = new StringBuilder(sql + sqlDistinct + string.Format(config.ColumnAccessFormat, config.Scheme, type, name) + " ");
+            }
         }
 
         private void ParseSelectExpression(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null, bool selectAll = false, bool distinct = false)
@@ -391,7 +426,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
             if (!string.IsNullOrEmpty(selectAllMark))
             {
-                string sqlRows = "," + conditionTranslator.ParseAnonymousSelector(null, exceptRowSelector, memberType, new SelectorConfig { SelectAll = true }).Result! + selectAllMark;
+                string sqlRows = "," + conditionTranslator.ParseAnonymousSelector(null, exceptColumnSelector, memberType, new SelectorConfig { SelectAll = true }).Result! + selectAllMark;
                 value = new StringBuilder(value.ToString().Replace(selectAllMark, sqlRows));
             }
         }
@@ -415,12 +450,12 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             return this;
         }
 
-        public IOrderNode<T> Order(Expression<Func<T, object>> rowSelector, OrderType orderType = OrderType.Asc)
+        public IOrderNode<T> Order(Expression<Func<T, object>> columnSelector, OrderType orderType = OrderType.Asc)
         {
-            if (rowSelector is null)
+            if (columnSelector is null)
                 throw new BuilderException("Row selector must be provided");
 
-            var parsed = conditionTranslator.ParseAnonymousSelector(rowSelector, config: new SelectorConfig
+            var parsed = conditionTranslator.ParseAnonymousSelector(columnSelector, config: new SelectorConfig
             {
                 AllowBinary = false,
                 AllowConstant = false

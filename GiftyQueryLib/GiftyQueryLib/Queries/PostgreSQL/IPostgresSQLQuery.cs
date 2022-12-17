@@ -9,41 +9,37 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         string Build();
     }
 
-    public interface ISelectNode : IQueryStringBuilder
-    {
-    }
-
-    public interface IOffsetNode : ISelectNode
+    public interface IOffsetNode : IQueryStringBuilder
     {
         IQueryStringBuilder Offset(int skipped);
     }
 
-    public interface ILimitNode : ISelectNode, IOffsetNode
+    public interface ILimitNode : IOffsetNode
     {
         IOffsetNode Limit(int limit);
     }
 
-    public interface IOrderNode<T> : ISelectNode, ILimitNode where T : class
+    public interface IOrderNode<T> : ILimitNode where T : class
     {
-        IOrderNode<T> Order(Expression<Func<T, object>> rowSelector, OrderType orderType = OrderType.Asc);
+        IOrderNode<T> Order(Expression<Func<T, object>> columnSelector, OrderType orderType = OrderType.Asc);
     }
 
-    public interface IHavingNode<T> : ISelectNode, IOrderNode<T> where T : class
+    public interface IHavingNode<T> : IOrderNode<T> where T : class
     {
         IOrderNode<T> Having(Expression<Func<T, bool>> condition);
     }
 
-    public interface IGroupNode<T> : ISelectNode, IHavingNode<T> where T : class
+    public interface IGroupNode<T> : IHavingNode<T> where T : class
     {
         IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null);
     }
 
-    public interface IWhereNode<T> : ISelectNode, IGroupNode<T> where T : class
+    public interface IWhereNode<T> : IGroupNode<T> where T : class
     {
         IWhereNode<T> Where(Expression<Func<T, bool>> condition);
     }
 
-    public interface IJoinNode<T> : ISelectNode, IWhereNode<T> where T : class
+    public interface IJoinNode<T> : IWhereNode<T> where T : class
     {
         IJoinNode<T> Join(Expression<Func<T, object>> selector, JoinType joinType = JoinType.Inner);
 
@@ -57,11 +53,15 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
     public interface IInstructionNode<T> : IQueryStringBuilder where T : class
     {
-        IJoinNode<T> Count(Expression<Func<T, object>>? rowSelector = null);
+        IJoinNode<T> Count(Expression<Func<T, object>>? columnSelector = null);
 
-        IJoinNode<T> CountDistinct(Expression<Func<T, object>>? rowSelector = null);
+        IJoinNode<T> CountDistinct(Expression<Func<T, object>>? columnSelector = null);
 
         IJoinNode<T> Select(Expression<Func<T, object>> include);
+
+        IJoinNode<T> SelectSingle(Expression<Func<T, object>>? columnSelector = null);
+
+        IJoinNode<T> SelectDistinctSingle(Expression<Func<T, object>>? columnSelector = null);
 
         IJoinNode<T> SelectDistinct(Expression<Func<T, object>> include);
 

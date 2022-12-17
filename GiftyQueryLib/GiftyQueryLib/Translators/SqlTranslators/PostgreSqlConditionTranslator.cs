@@ -346,6 +346,14 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     var translator = new PostgreSqlConditionTranslator(config, func);
                     translatedInnerExpression = translator.Translate(base.type!, bExp);
                 }
+                else if (uArg is not null && uArg.Operand is LambdaExpression lExp)
+                {
+                    if (methodName == "Exists")
+                    {
+                        var translator = new PostgreSqlConditionTranslator(config, func);
+                        translatedInnerExpression = translator.Translate(base.type!, lExp);
+                    }
+                }
                 else
                     throw new BuilderException($"The parameter of function/method is invalid in anonymous expression");
 

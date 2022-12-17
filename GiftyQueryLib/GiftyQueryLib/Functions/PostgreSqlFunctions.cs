@@ -52,7 +52,8 @@ namespace GiftyQueryLib.Functions
             { "Max", ("MAX({0})", Constants.NumericTypes) },
             { "Concat", ("CONCAT({0})", null) },
             { "Alias", ("", null) },
-            { "Distinct", ("DISTINCT ON ({0})", null) }
+            { "Distinct", ("DISTINCT ON ({0})", null) },
+            { "Exists", ("EXISTS ({0})", null) }
         };
 
         #endregion
