@@ -125,10 +125,36 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     else
                     {
                         var genericArg = property.GetGenericArg();
-                        if (Constants.StringTypes.Contains(genericArg!) || Constants.NumericTypes.Contains(genericArg))
+
+                        if (genericArg is null)
+                            throw new BuilderException("Non-generic collections are not supported");
+
+                        if (Constants.StringTypes.Contains(genericArg) || Constants.NumericTypes.Contains(genericArg))
                         {
                             propName = property.Name.ToCaseFormat(caseConfig);
-                            // TODO Handle PostgreSQL Arrays
+                            var val = property.GetValue(entity);
+
+                            if (val is null)
+                            {
+                                value = "NULL";
+                                continue;
+                            }
+
+                            var collection = (IEnumerable)val;
+                            var collectionSb = new StringBuilder();
+                            var isNumeric = Constants.NumericTypes.Contains(genericArg);
+                            var isString = !isNumeric && Constants.StringTypes.Contains(genericArg);
+
+                            if (!isNumeric && !isString)
+                                throw new BuilderException($"Invalid type {genericArg!.Name} of collection");
+
+                            foreach (var item in collection)
+                            {
+                                var defaultValue = item is null ? "NULL" : (isString ? $"'{item}'" : item.ToString());
+                                collectionSb.Append(defaultValue + ", ");
+                            }
+
+                            value = "{"+ collectionSb.TrimEndComma() +"}";
                         }
                         else
                             continue;
@@ -674,7 +700,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                         throw new BuilderException("Member expression should not be null");
 
                     arg = mArg.Member.Name;
-                    argNullable = Nullable.GetUnderlyingType((mArg.Member as PropertyInfo).PropertyType) != null;
+                    argNullable = Nullable.GetUnderlyingType((mArg.Member as PropertyInfo)!.PropertyType) != null;
                     expObj = m.Object;
                 }
                 else if (m.Arguments[0] is UnaryExpression uArg && uArg.Operand is MemberExpression umExp)
@@ -683,7 +709,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                         throw new BuilderException("Member expression should not be null");
 
                     arg = umExp.Member.Name;
-                    argNullable = Nullable.GetUnderlyingType((umExp.Member as PropertyInfo).PropertyType) != null;
+                    argNullable = Nullable.GetUnderlyingType((umExp.Member as PropertyInfo)!.PropertyType) != null;
                     expObj = m.Object;
                 }
                 else
@@ -744,6 +770,10 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if ((obj.Type.IsGenericType && obj.Type.GenericTypeArguments.Length == 1 && isEnumerable) || isArray)
             {
                 var genericArg = isArray ? obj.Type : obj.Type.GenericTypeArguments[0];
+
+                if (genericArg is null)
+                    throw new BuilderException("Non-generic collections are not supported");
+
                 var val = obj.Value;
 
                 if (val is null)
