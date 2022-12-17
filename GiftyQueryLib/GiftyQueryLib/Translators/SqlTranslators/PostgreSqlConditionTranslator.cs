@@ -150,7 +150,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                             foreach (var item in collection)
                             {
-                                var defaultValue = item is null ? "NULL" : (isString ? $"'{item}'" : item.ToString());
+                                var defaultValue = item is null ? "NULL" : item.ToString();
                                 collectionSb.Append(defaultValue + ", ");
                             }
 
