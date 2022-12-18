@@ -7,6 +7,7 @@ using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 
 namespace GiftyQueryLib.Translators.SqlTranslators
 {
@@ -45,22 +46,28 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// </summary>
         /// <param name="property">Target property</param>
         /// <returns></returns>
-        public virtual (CustomAttributeData? keyAttrData, CustomAttributeData? notMappedAttrData, CustomAttributeData? foreignKeyAttrData) GetAttrData(PropertyInfo? property)
+        public virtual Dictionary<AttrType, CustomAttributeData> GetAttrData(PropertyInfo? property)
         {
             var attributeData = property is null ? new List<CustomAttributeData>() : property.GetCustomAttributesData();
-
-            CustomAttributeData? keyAttrData = null;
-            CustomAttributeData? notMappedAttrData = null;
-            CustomAttributeData? foreignKeyAttrData = null;
+            var dict = new Dictionary<AttrType, CustomAttributeData>();
 
             foreach (var attr in attributeData)
             {
-                if (config.KeyAttributes.Any(type => attr.AttributeType == type)) keyAttrData = attr;
-                if (config.NotMappedAttributes.Any(type => attr.AttributeType == type)) notMappedAttrData = attr;
-                if (config.ForeignKeyAttributes.Any(type => attr.AttributeType == type)) foreignKeyAttrData = attr;
+                if (config.KeyAttributes.Any(type => attr.AttributeType == type))
+                    dict.Add(AttrType.Key, attr);
+                else if (config.NotMappedAttributes.Any(type => attr.AttributeType == type))
+                    dict.Add(AttrType.NotMapped, attr);
+                else if (config.ForeignKeyAttributes.Any(type => attr.AttributeType == type))
+                    dict.Add(AttrType.ForeignKey, attr);
+                else if (config.JsonAttributes.Any(type => attr.AttributeType == type))
+                    dict.Add(AttrType.Json, attr);
+                else if (config.UseNamesProvidedInTableAttribute && attr.AttributeType.Name == AttrType.Table.ToString())
+                    dict.Add(AttrType.Table, attr);
+                else if (config.UseNamesProvidedInColumnAttribute && attr.AttributeType.Name == AttrType.Column.ToString())
+                    dict.Add(AttrType.Column, attr);
             }
 
-            return (keyAttrData, notMappedAttrData, foreignKeyAttrData);
+            return dict;
         }
 
         /// <summary>
@@ -81,19 +88,21 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
             foreach (var property in props)
             {
-                var (keyAttrData, notMappedAttrData, foreignKeyAttrData) = GetAttrData(property);
+                var attrData = GetAttrData(property);
 
-                if ((keyAttrData is not null && removeKeyProp) || notMappedAttrData is not null)
+                if ((attrData.Value(AttrType.Key) is not null && removeKeyProp) || attrData.Value(AttrType.NotMapped) is not null)
                     continue;
 
-                string propName = string.Empty;
+                string? propName = string.Empty;
                 object? value = null;
 
-                if (foreignKeyAttrData is not null)
+                var fKAttr = attrData.Value(AttrType.ForeignKey);
+
+                if (fKAttr is not null)
                 {
                     if (!property.IsCollection())
                     {
-                        propName = foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
+                        propName = fKAttr.ConstructorArguments[0].Value?.ToString()?.ToCaseFormat(caseConfig);
 
                         var keyProp = property.PropertyType.GetProperties().FirstOrDefault(prop => prop.GetCustomAttributes(true)
                               .FirstOrDefault(attr => config.KeyAttributes.Any(it => attr.GetType() == it)) is not null);
@@ -117,47 +126,54 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 }
                 else
                 {
-                    if (!property.IsCollection())
+                    propName = property.Name.ToCaseFormat(caseConfig);
+                    var val = property.GetValue(entity);
+
+                    if (attrData.Value(AttrType.Json) is not null)
                     {
-                        propName = property.Name.ToCaseFormat(caseConfig);
-                        value = property.GetValue(entity);
+                        try
+                        {
+                            // TODO: Add possibility to change Json Serializator from default to custom (ex. Newtonsoft)
+                            value = "{\"" + propName + "\": " + JsonSerializer.Serialize(val) + "}";
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new BuilderException($"Cannot serialize \"{propName}\" json field. Details: {ex.Message}");
+                        }
                     }
                     else
                     {
-                        var genericArg = property.GetGenericArg();
-
-                        if (genericArg is null)
-                            throw new BuilderException("Non-generic collections are not supported");
-
-                        if (Constants.StringTypes.Contains(genericArg) || Constants.NumericTypes.Contains(genericArg))
+                        if (!property.IsCollection())
+                            value = val;
+                        else
                         {
-                            propName = property.Name.ToCaseFormat(caseConfig);
-                            var val = property.GetValue(entity);
+                            var genericArg = property.GetGenericArg();
 
-                            if (val is null)
-                            {
-                                value = "NULL";
-                                continue;
-                            }
+                            if (genericArg is null)
+                                throw new BuilderException("Non-generic collections are not supported");
 
-                            var collection = (IEnumerable)val;
-                            var collectionSb = new StringBuilder();
                             var isNumeric = Constants.NumericTypes.Contains(genericArg);
                             var isString = !isNumeric && Constants.StringTypes.Contains(genericArg);
 
-                            if (!isNumeric && !isString)
-                                throw new BuilderException($"Invalid type {genericArg!.Name} of collection");
-
-                            foreach (var item in collection)
+                            if (isString || isNumeric)
                             {
-                                var defaultValue = item is null ? "NULL" : item.ToString();
-                                collectionSb.Append(defaultValue + ", ");
-                            }
+                                if (val is null)
+                                    value = "NULL";
+                                else
+                                {
+                                    var collection = (IEnumerable)val;
+                                    var collectionSb = new StringBuilder();
 
-                            value = "{"+ collectionSb.TrimEndComma() +"}";
+                                    foreach (var item in collection)
+                                    {
+                                        var defaultValue = item is null ? "NULL" : item.ToString();
+                                        collectionSb.Append(defaultValue + ", ");
+                                    }
+
+                                    value = "{" + collectionSb.TrimEndComma() + "}";
+                                }
+                            }
                         }
-                        else
-                            continue;
                     }
                 }
 
@@ -267,21 +283,22 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             var type = extraType ?? typeof(TItem);
             foreach (var property in type.GetProperties())
             {
-                var (keyAttrData, notMappedAttrData, foreignKeyAttrData) = GetAttrData(property);
+                var attrData = GetAttrData(property);
 
-                if (notMappedAttrData is not null || (exceptSelector is not null && exceptMembers.Any(it => it.Name == property.Name)))
+                if (attrData.Value(AttrType.NotMapped) is not null || (exceptSelector is not null && exceptMembers.Any(it => it.Name == property.Name)))
                     continue;
 
-                if (foreignKeyAttrData is not null && property.IsCollection())
+                var fkAttr = attrData.Value(AttrType.ForeignKey);
+                if (fkAttr is not null && property.IsCollection())
                     continue;
 
-                if (foreignKeyAttrData is null && property.IsCollection() &&
+                if (fkAttr is null && property.IsCollection() &&
                     !Constants.StringTypes.Contains(property.GetGenericArg() ?? typeof(object)) &&
                     !Constants.NumericTypes.Contains(property.GetGenericArg() ?? typeof(object)))
                     continue;
 
-                sb.Append(foreignKeyAttrData is not null
-                    ? string.Format(config.ColumnAccessFormat + ", ", config.Scheme, type.ToCaseFormat(caseConfig), foreignKeyAttrData.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat(caseConfig))
+                sb.Append(fkAttr is not null
+                    ? string.Format(config.ColumnAccessFormat + ", ", config.Scheme, type.ToCaseFormat(caseConfig), fkAttr.ConstructorArguments[0]!.Value!.ToString()!.ToCaseFormat(caseConfig))
                     : string.Format(config.ColumnAccessFormat + ", ", config.Scheme, type.ToCaseFormat(caseConfig), property.Name.ToCaseFormat(caseConfig)));
             }
 

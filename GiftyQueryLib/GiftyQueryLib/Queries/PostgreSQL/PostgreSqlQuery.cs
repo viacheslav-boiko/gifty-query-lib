@@ -9,7 +9,6 @@ using GiftyQueryLib.Utils;
 using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
 using System.Text;
-using System.Xml.Linq;
 
 namespace GiftyQueryLib.Queries.PostgreSQL
 {
@@ -62,8 +61,8 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
         public IJoinNode<T> SelectSingle(Expression<Func<T, object>>? columnSelector = null)
         {
-            ParseSelectSingleExpression(columnSelector); 
-            
+            ParseSelectSingleExpression(columnSelector);
+
             return this;
         }
 
@@ -113,18 +112,20 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
                     if (value is not null)
                     {
-                        var (keyAttrData, notMappedAttrData, foreignKeyAttrData) = conditionTranslator.GetAttrData(property);
+                        var attrData = conditionTranslator.GetAttrData(property);
 
-                        if (keyAttrData is null && notMappedAttrData is null)
+                        if (attrData.Value(AttrType.Key) is null && attrData.Value(AttrType.NotMapped) is null)
                         {
                             string propName;
-                            if (foreignKeyAttrData is null)
+                            var fkAttr = attrData.Value(AttrType.ForeignKey);
+
+                            if (fkAttr is null)
                             {
                                 if (property.IsCollection())
                                 {
                                     var generic = property.GetGenericArg();
 
-                                    if (Constants.StringTypes.Contains(generic!) || Constants.NumericTypes.Contains(generic!))
+                                    if (Constants.StringTypes.Contains(generic!) || Constants.NumericTypes.Contains(generic!) || attrData.Value(AttrType.Json) is not null)
                                         propName = property.Name.ToCaseFormat(caseConfig);
                                     else
                                         continue;
@@ -147,7 +148,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                                     }
                                 }
                                 else
-                                    propName = foreignKeyAttrData.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
+                                    propName = fkAttr.ConstructorArguments[0].Value!.ToString()!.ToCaseFormat(caseConfig);
                             }
 
                             nonNullableProps.Add(string.Format("{0}", propName));

@@ -1,6 +1,7 @@
 ﻿using GiftyQueryLib.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace GiftyQueryLib.Config
 {
@@ -71,6 +72,15 @@ namespace GiftyQueryLib.Config
         public HashSet<Type> ForeignKeyAttributes { get; } = new HashSet<Type>
         {
             typeof(ForeignKeyAttribute)
+        };
+
+        /// <summary>
+        /// List of attribute types that mark field as a json field<br/>
+        /// Default: <b>JsonIncludeAttribute</b>
+        /// </summary>
+        public HashSet<Type> JsonAttributes { get; } = new HashSet<Type>
+        {
+            typeof(JsonIncludeAttribute)
         };
 
         /// <summary>
