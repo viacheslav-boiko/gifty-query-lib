@@ -1,20 +1,21 @@
 ﻿using GiftyQueryLib.Enums;
+using System.Collections;
+using System.Reflection;
 using System.Text;
 
 namespace GiftyQueryLib.Utils
 {
-    public static class CaseFormatter
+    /// <summary>
+    /// Class for extension methods
+    /// </summary>
+    public static class Extensions
     {
-        /// <summary>
-        /// Converts string into formatted case
-        /// </summary>
-        /// <param name="text">Source text</param>
-        /// <returns>Formatted string in a specified case</returns>
-        /// <exception cref="ArgumentNullException"></exception>
+        #region Case Formatter Extentions
+
         public static string ToCaseFormat(this string text, CaseFormatterConfig config)
         {
-            if (text == null)
-                throw new ArgumentNullException(nameof(text));
+            if (string.IsNullOrEmpty(text))
+                return text;
 
             var caseType = config.CaseType;
 
@@ -27,11 +28,6 @@ namespace GiftyQueryLib.Utils
             };
         }
 
-        /// <summary>
-        /// Converts type name into formatted case
-        /// </summary>
-        /// <param name="type">Source type</param>
-        /// <returns>Formatted string in a specified case</returns>
         public static string ToCaseFormat(this Type type, CaseFormatterConfig config)
         {
             return ToCaseFormat(type.Name, config);
@@ -47,7 +43,7 @@ namespace GiftyQueryLib.Utils
             for (int i = 1; i < text.Length; ++i)
             {
                 char c = text[i];
-                
+
                 if (c == '_')
                 {
                     i++;
@@ -81,6 +77,46 @@ namespace GiftyQueryLib.Utils
             }
             return sb.ToString();
         }
+
+        #endregion
+
+        #region Property Extensions
+
+        public static bool IsEnumerable(this PropertyInfo? property) => property is not null && typeof(IEnumerable).IsAssignableFrom(property.PropertyType) && property.PropertyType != typeof(string);
+        public static bool IsArray(this PropertyInfo? property) => property is not null && typeof(Array).IsAssignableFrom(property.PropertyType);
+        public static bool IsCollection(this PropertyInfo? property) => IsEnumerable(property) || IsArray(property);
+        public static Type? GetGenericArg(this PropertyInfo? property) => property is not null
+            ? IsArray(property) ? property.PropertyType : property.PropertyType.GenericTypeArguments.FirstOrDefault()
+            : null;
+
+        #endregion
+
+        #region Dictionary Extensions
+
+        public static U? Value<T, U>(this Dictionary<T, U>? dict, T key) where T : notnull
+        {
+            if (dict is null)
+                return default;
+
+            var result = dict.TryGetValue(key, out var value);
+
+            if (!result || value is null)
+                return default;
+
+            return value;
+        }
+
+        #endregion
+
+        #region String Extensions
+
+        public static string TrimEndComma(this string str, int count = 2)
+          => str.EndsWith(", ") ? str.Remove(str.Length - count) : str;
+
+        public static string TrimEndComma(this StringBuilder sb, int count = 2)
+            => TrimEndComma(sb.ToString(), count);
+
+        #endregion
     }
 
     public class CaseFormatterConfig

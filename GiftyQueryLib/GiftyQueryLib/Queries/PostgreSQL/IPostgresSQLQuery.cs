@@ -9,7 +9,10 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         string Build();
     }
 
-    public interface IOffsetNode : IQueryStringBuilder
+    public interface ISelectQuery : IQueryStringBuilder { }
+    public interface IEditQuery : IQueryStringBuilder { }
+
+    public interface IOffsetNode : ISelectQuery
     {
         IQueryStringBuilder Offset(int skipped);
     }
@@ -46,7 +49,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         IJoinNode<T> Join<U>(Expression<Func<U, object>> selector, JoinType joinType = JoinType.Inner);
     }
 
-    public interface IEditConditionNode<T> : IQueryStringBuilder where T : class
+    public interface IEditConditionNode<T> : IEditQuery where T : class
     {
         IQueryStringBuilder Predicate(Expression<Func<T, bool>> condition);
     }
