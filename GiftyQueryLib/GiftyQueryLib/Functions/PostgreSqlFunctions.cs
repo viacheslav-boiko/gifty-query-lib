@@ -1,5 +1,4 @@
-﻿using GiftyQueryLib.Utils;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 
 namespace GiftyQueryLib.Functions
 {
@@ -43,38 +42,39 @@ namespace GiftyQueryLib.Functions
         /// <summary>
         /// PostgreSQL Functions Syntaxes
         /// </summary>
-        public Dictionary<string, (string value, HashSet<Type?>? allowedTypes)> Functions => new()
+        public Dictionary<string, string> Functions => new()
         {
-            { "Count", ("COUNT({0})", null) },
-            { "Sum", ("SUM({0})", Constants.NumericTypes) },
-            { "Avg", ("AVG({0})", Constants.NumericTypes) },
-            { "Min", ("MIN({0})", Constants.NumericTypes) },
-            { "Max", ("MAX({0})", Constants.NumericTypes) },
-            { "Concat", ("CONCAT({0})", null) },
-            { "Alias", ("", null) },
-            { "Distinct", ("DISTINCT ON ({0})", null) },
-            { "Exists", ("EXISTS ({0})", null) }
+            { "Count", "COUNT({0})" },
+            { "Sum", "SUM({0})" },
+            { "Avg", "AVG({0})" },
+            { "Min", "MIN({0})"},
+            { "Max", "MAX({0})" },
+            { "Concat", "CONCAT({0})" },
+            { "Alias", "" },
+            { "Distinct", "DISTINCT ON ({0})" },
+            { "Exists", "EXISTS ({0})" }
         };
 
         #endregion
 
         #region Utils
 
+        // TODO: Rethink how to check allowed types or come up with other solutions
         /// <summary>
         /// Check if specified type contains inside function allowed types set
         /// </summary>
         /// <param name="source"></param>
         /// <param name="funcName"></param>
         /// <returns></returns>
-        public bool CheckFunctionAllowedTypes(Type? source, string funcName)
-        {
-            var func = Functions.TryGetValue(funcName, out var result);
+        //public bool CheckFunctionAllowedTypes(Type? source, string funcName)
+        //{
+        //    var func = Functions.TryGetValue(funcName, out var result);
 
-            if (!func || source is null)
-                return false;
+        //    if (!func || source is null)
+        //        return false;
 
-            return result.allowedTypes == null || result.allowedTypes?.Contains(source) == true;
-        }
+        //    return result.allowedTypes == null || result.allowedTypes?.Contains(source) == true;
+        //}
 
         #endregion
     }

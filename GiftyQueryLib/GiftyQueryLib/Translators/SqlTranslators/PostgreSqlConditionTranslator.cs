@@ -177,7 +177,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     }
                 }
 
-                dict.Add(propName, value);
+                dict.Add(propName ?? "", value);
             }
 
             return dict;
@@ -444,7 +444,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                         });
 
-                        var result = string.Format(func.Functions[methodName].value, string.Join(',', columns));
+                        var result = string.Format(func.Functions[methodName], string.Join(',', columns));
 
                         if (paramName is null)
                             return result + ", ";
@@ -490,10 +490,10 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 if (CheckIfMethodExists(methodName, func.Functions!))
                 {
-                    if (!func.CheckFunctionAllowedTypes((memberInfo as PropertyInfo)!.PropertyType, methodName))
-                        throw new BuilderException($"Type \"{(memberInfo as PropertyInfo)!.PropertyType.Name}\" should not be used in method \"{methodName}\"");
+                    //if (!func.CheckFunctionAllowedTypes((memberInfo as PropertyInfo)!.PropertyType, methodName))
+                    //    throw new BuilderException($"Type \"{(memberInfo as PropertyInfo)!.PropertyType.Name}\" should not be used in method \"{methodName}\"");
 
-                    format = string.Format(func.Functions[methodName].value, format);
+                    format = string.Format(func.Functions[methodName], format);
                 }
 
                 var memberName = memberAttributes is null
@@ -519,7 +519,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             {
                 if (CheckIfMethodExists(methodName, func.Functions!) && methodName != "Distinct")
                 {
-                    string result = string.Format(func.Functions[methodName].value, translatedInnerExpression);
+                    string result = string.Format(func.Functions[methodName], translatedInnerExpression);
 
                     if (paramName is null)
                         sb.Append(result + ", ");
@@ -566,7 +566,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <param name="functions"></param>
         /// <returns></returns>
         /// <exception cref="BuilderException"></exception>
-        protected virtual bool CheckIfMethodExists(string? methodName, Dictionary<string, (string value, HashSet<Type> allowedTypes)> functions) =>
+        protected virtual bool CheckIfMethodExists(string? methodName, Dictionary<string, string> functions) =>
             methodName is not null && functions.ContainsKey(methodName)
             ? true
             : throw new BuilderException($"Funtion '{methodName}' is not registered into dictionary {nameof(func.Functions)}");
