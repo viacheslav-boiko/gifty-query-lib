@@ -1,4 +1,5 @@
-﻿using GiftyQueryLib.Enums;
+﻿using GiftyQueryLib.Config;
+using GiftyQueryLib.Enums;
 using System.Collections;
 using System.Reflection;
 using System.Text;
@@ -12,7 +13,7 @@ namespace GiftyQueryLib.Utils
     {
         #region Case Formatter Extentions
 
-        public static string ToCaseFormat(this string text, CaseFormatterConfig config)
+        public static string ToCaseFormat(this string text, CaseConfig config)
         {
             if (string.IsNullOrEmpty(text))
                 return text;
@@ -28,7 +29,7 @@ namespace GiftyQueryLib.Utils
             };
         }
 
-        public static string ToCaseFormat(this Type type, CaseFormatterConfig config)
+        public static string ToCaseFormat(this Type type, CaseConfig config)
         {
             return ToCaseFormat(type.Name, config);
         }
@@ -117,11 +118,5 @@ namespace GiftyQueryLib.Utils
             => TrimEndComma(sb.ToString(), count);
 
         #endregion
-    }
-
-    public class CaseFormatterConfig
-    {
-        public CaseType CaseType { get; set; }
-        public Func<string, string> CaseFormatterFunc { get; set; } = it => it;
     }
 }

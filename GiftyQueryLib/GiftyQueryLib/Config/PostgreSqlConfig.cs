@@ -1,5 +1,4 @@
-﻿using GiftyQueryLib.Enums;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
@@ -14,24 +13,17 @@ namespace GiftyQueryLib.Config
 
         public PostgreSqlConfig(PostgreSqlConfig config)
         {
-            CaseType = config.CaseType;
-            CaseFormatterFunc= config.CaseFormatterFunc;
-            UseNamesProvidedInColumnAttribute= config.UseNamesProvidedInColumnAttribute;
+            CaseConfig = config.CaseConfig;
+            UseNamesProvidedInColumnAttribute = config.UseNamesProvidedInColumnAttribute;
             UseNamesProvidedInTableAttribute = config.UseNamesProvidedInTableAttribute;
             Scheme = config.Scheme;
             ColumnAccessFormat = config.ColumnAccessFormat;
         }
 
         /// <summary>
-        /// Case Formatting for Database Objects
-        /// Default: Snake
+        /// Case Formatter Configuration
         /// </summary>
-        public CaseType CaseType { get; init; } = CaseType.Snake;
-
-        /// <summary>
-        /// Custom Formatting function using when CaseType is set to the "Custom"
-        /// </summary>
-        public Func<string, string> CaseFormatterFunc { get; set; } = it => it;
+        public CaseConfig CaseConfig { get; init; } = new();
 
         /// <summary>
         /// If flag is <b>true</b>, system will take database column name that set in Column attribute while creating the query<br/>

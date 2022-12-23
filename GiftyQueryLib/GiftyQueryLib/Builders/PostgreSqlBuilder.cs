@@ -1,6 +1,5 @@
 ﻿using GiftyQueryLib.Config;
 using GiftyQueryLib.Enums;
-using GiftyQueryLib.Functions;
 using GiftyQueryLib.Queries.PostgreSQL;
 using System.Linq.Expressions;
 
@@ -191,10 +190,22 @@ namespace GiftyQueryLib.Builders.PostgreSql
 
         #endregion
 
+        #region Subqueries
+
+        #region Subqueries
+
         /// <summary>
-        /// PostgreSQL Functions
+        /// Transforms into <b>EXISTS(expression)</b> sql subquery<br/>
+        /// Allows to create custom select subquery
         /// </summary>
-        public PostgreSqlFunctions Func { get; }
+        /// <typeparam name="T"></typeparam>
+        /// <param name="selectQuery"></param>
+        /// <returns></returns>
+        public bool Exists(ISelectQuery selectQuery);
+
+        #endregion
+
+        #endregion
     }
 
     public class PostgreSqlBuilder : IPostgreSqlBuilder
@@ -205,11 +216,6 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// PostgreSQL Configuration
         /// </summary>
         public PostgreSqlConfig Config { get; init; } = new();
-
-        /// <summary>
-        /// PostgreSQL Functions
-        /// </summary>
-        public PostgreSqlFunctions Func => PostgreSqlFunctions.Instance;
 
         #endregion
 
@@ -224,7 +230,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public IInstructionNode<T> UseConfig<T>(PostgreSqlConfig config) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(config, Func);
+            return new PostgreSqlQuery<T>(config);
         }
 
         /// <summary>
@@ -236,7 +242,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         public IInstructionNode<T> UseScheme<T>(string scheme) where T : class
         {
             var config = new PostgreSqlConfig(Config) { Scheme = scheme };
-            return PostgreSqlQuery<T>.Flow(config, Func);
+            return new PostgreSqlQuery<T>(config);
         }
 
         /// <summary>
@@ -248,11 +254,12 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public IInstructionNode<T> UseCaseFormat<T>(CaseType caseType, Func<string, string>? caseFormatterFunc = null) where T : class
         {
-            var config = new PostgreSqlConfig(Config) { CaseType = caseType };
+            var config = new PostgreSqlConfig(Config);
+            config.CaseConfig.CaseType = caseType;
             if (caseFormatterFunc is not null && caseType == CaseType.Custom)
-                config.CaseFormatterFunc = caseFormatterFunc;
+                config.CaseConfig.CaseFormatterFunc = caseFormatterFunc;
 
-            return PostgreSqlQuery<T>.Flow(config, Func);
+            return new PostgreSqlQuery<T>(config);
         }
 
         /// <summary>
@@ -263,7 +270,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public IJoinNode<T> Count<T>(Expression<Func<T, object>>? columnSelector = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Count(columnSelector);
+            return new PostgreSqlQuery<T>(Config).Count(columnSelector);
         }
 
         /// <summary>
@@ -274,7 +281,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public IJoinNode<T> CountDistinct<T>(Expression<Func<T, object>>? columnSelector = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).CountDistinct(columnSelector);
+            return new PostgreSqlQuery<T>(Config).CountDistinct(columnSelector);
         }
 
         /// <summary>
@@ -284,7 +291,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <param name="include">Columns to include into selection</param>
         public virtual IJoinNode<T> Select<T>(Expression<Func<T, object>> include) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Select(include);
+            return new PostgreSqlQuery<T>(Config).Select(include);
         }
 
         /// <summary>
@@ -295,7 +302,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public IJoinNode<T> SelectSingle<T>(Expression<Func<T, object>>? columnSelector = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).SelectSingle(columnSelector);
+            return new PostgreSqlQuery<T>(Config).SelectSingle(columnSelector);
         }
 
         /// <summary>
@@ -305,7 +312,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <param name="include">Columns to include into selection</param>
         public IJoinNode<T> SelectDistinct<T>(Expression<Func<T, object>> include) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).SelectDistinct(include);
+            return new PostgreSqlQuery<T>(Config).SelectDistinct(include);
         }
 
         /// <summary>
@@ -317,7 +324,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public IJoinNode<T> SelectAll<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).SelectAll(include, exclude);
+            return new PostgreSqlQuery<T>(Config).SelectAll(include, exclude);
         }
 
         /// <summary>
@@ -329,7 +336,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <returns></returns>
         public IJoinNode<T> SelectDistinctAll<T>(Expression<Func<T, object>>? include = null, Expression<Func<T, object>>? exclude = null) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).SelectDistinctAll(include, exclude);
+            return new PostgreSqlQuery<T>(Config).SelectDistinctAll(include, exclude);
         }
 
         /// <summary>
@@ -339,7 +346,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <param name="entities">Entities to insert</param>
         public virtual IQueryStringBuilder Insert<T>(params T[] entities) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Insert(entities);
+            return new PostgreSqlQuery<T>(Config).Insert(entities);
         }
 
         /// <summary>
@@ -349,7 +356,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <param name="entities">Entity to update</param>
         public virtual IEditConditionNode<T> Update<T>(object entity) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Update(entity);
+            return new PostgreSqlQuery<T>(Config).Update(entity);
         }
 
         /// <summary>
@@ -359,7 +366,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <param name="entities">Entities to update</param>
         public IQueryStringBuilder UpdateRange<T>(params object[] entities) where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).UpdateRange(entities);
+            return new PostgreSqlQuery<T>(Config).UpdateRange(entities);
         }
 
         /// <summary>
@@ -368,7 +375,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         /// <typeparam name="T"></typeparam>
         public virtual IEditConditionNode<T> Delete<T>() where T : class
         {
-            return PostgreSqlQuery<T>.Flow(Config, Func).Delete();
+            return new PostgreSqlQuery<T>(Config).Delete();
         }
 
         #endregion
@@ -441,9 +448,16 @@ namespace GiftyQueryLib.Builders.PostgreSql
 
         #endregion
 
-        #region Dynamic
+        #region Subqueries
 
-
+        /// <summary>
+        /// Transforms into <b>EXISTS(expression)</b> sql subquery<br/>
+        /// Allows to create custom select subquery
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="selectQuery"></param>
+        /// <returns></returns>
+        public bool Exists(ISelectQuery selectQuery) => default;
 
         #endregion
     }
