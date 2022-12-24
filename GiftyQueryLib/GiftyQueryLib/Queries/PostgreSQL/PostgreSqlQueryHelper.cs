@@ -19,6 +19,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
     {
         private readonly PostgreSqlTranslator translator;
         private readonly PostgreSqlConfig config;
+        private readonly Type type;
 
         protected StringBuilder value = new(string.Empty);
         protected bool whereIsUsed = false;
@@ -28,12 +29,13 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="translator"></param>
         /// <param name="config"></param>
-        public PostgreSqlQueryHelper(PostgreSqlConfig config)
+        /// <param name="extraType"></param>
+        public PostgreSqlQueryHelper(PostgreSqlConfig config, Type? extraType = null)
         {
             this.translator = new PostgreSqlTranslator(config);
             this.config = config;
+            this.type = extraType ?? typeof(T);
         }
 
         #region Count
@@ -121,7 +123,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
 
             string sqlDistinct = distinct ? "DISTINCT " : "";
             string sqlRows = parsedSelector + (selectAll ? selectAllMark : "");
-            string sqlFrom = string.Format(" FROM {0}.{1} ", config.Scheme, typeof(T).ToCaseFormat(config.CaseConfig));
+            string sqlFrom = string.Format(" FROM {0}.{1} ", config.Scheme, type.ToCaseFormat(config.CaseConfig));
 
             value = new StringBuilder(sql + sqlDistinct + sqlRows + sqlFrom);
         }
@@ -223,7 +225,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             string columnsSql = string.Join(',', nonNullableProps);
             string rowsSql = string.Join(',', values);
 
-            value = new StringBuilder(string.Format("INSERT INTO {0}.{1} ({2}) VALUES {3}", config.Scheme, typeof(T).ToCaseFormat(config.CaseConfig), columnsSql, rowsSql));
+            value = new StringBuilder(string.Format("INSERT INTO {0}.{1} ({2}) VALUES {3}", config.Scheme, type.ToCaseFormat(config.CaseConfig), columnsSql, rowsSql));
         }
 
         #endregion
@@ -238,7 +240,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         {
             var entityData = translator.Helper.GetPopertyWithValueOfEntity(entity);
             var pairs = new StringBuilder();
-            var type = typeof(T).ToCaseFormat(config.CaseConfig);
+            var fType = type.ToCaseFormat(config.CaseConfig);
 
             entityData.ToList().ForEach(pair =>
             {
@@ -247,12 +249,12 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                     ? "NULL" : string.Format(Constants.StringTypes.Contains(value.GetType())
                         ? "'{0}'" : "{0}", value.ToString());
 
-                pairs.AppendFormat(config.ColumnAccessFormat + " = {3}, ", config.Scheme, type, pair.Key, parsedValue);
+                pairs.AppendFormat(config.ColumnAccessFormat + " = {3}, ", config.Scheme, fType, pair.Key, parsedValue);
             });
 
             var pairsSql = pairs.TrimEndComma();
 
-            value = new StringBuilder(string.Format("UPDATE {0}.{1} SET {2} ", config.Scheme, type, pairsSql));
+            value = new StringBuilder(string.Format("UPDATE {0}.{1} SET {2} ", config.Scheme, fType, pairsSql));
         }
 
         /// <summary>
@@ -270,7 +272,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             var propsSb = new StringBuilder();
             var pairsSb = new StringBuilder();
             var tempTable = $"tmp_{Guid.NewGuid().ToString().Split('-')[0]}";
-            var type = typeof(T).ToCaseFormat(config.CaseConfig);
+            var fType = type.ToCaseFormat(config.CaseConfig);
 
             bool propsWritten = false;
 
@@ -286,7 +288,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
                         var prop = pair.Key.ToCaseFormat(config.CaseConfig);
                         propsSb.Append(prop + ", ");
                         pairsSb.AppendFormat(config.ColumnAccessFormat + " = {3}, ", config.Scheme,
-                            type, prop, tempTable + "." + prop);
+                            fType, prop, tempTable + "." + prop);
                     }
 
                     var value = pair.Value;
@@ -309,7 +311,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             var pairsSql = pairsSb.TrimEndComma();
 
             value = new StringBuilder(string.Format("UPDATE {0}.{1} SET {2} FROM (VALUES {3}) AS {4} ({5})",
-                config.Scheme, type, pairsSql, valuesSetSql, tempTable, propsSql));
+                config.Scheme, fType, pairsSql, valuesSetSql, tempTable, propsSql));
         }
 
         #endregion
@@ -321,7 +323,7 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         /// </summary>
         public virtual void Delete()
         {
-            value = new StringBuilder(string.Format("DELETE FROM {0}.{1} ", config.Scheme, typeof(T).ToCaseFormat(config.CaseConfig)));
+            value = new StringBuilder(string.Format("DELETE FROM {0}.{1} ", config.Scheme, type.ToCaseFormat(config.CaseConfig)));
         }
 
         #endregion

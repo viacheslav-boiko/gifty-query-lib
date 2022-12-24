@@ -222,9 +222,16 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 return m;
             }
 
+            if (m.Method.DeclaringType?.Name == "Math")
+            {
+                var parsed = Helper.ParseMathMethodCallExpression(m, type!);
+                sb.Append(parsed); 
+                return m;
+            }
+
             if (Helper.Functions.ContainsKey(m.Method.Name))
             {
-                string parsed = Helper.ParseMethodCallExpression(m, type!).TrimEndComma();
+                var parsed = Helper.ParseMethodCallExpression(m, type!).TrimEndComma();
                 sb.Append(parsed);
                 return m;
             }
