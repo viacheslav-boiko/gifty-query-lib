@@ -123,11 +123,6 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             return this;
         }
 
-        public virtual string Build()
-        {
-            return helper.ToString();
-        }
-
         public virtual IHavingNode<T> Group(Expression<Func<T, object>> include, Expression<Func<T, object>>? exclude = null)
         {
             helper.Group(include, exclude);
@@ -144,6 +139,11 @@ namespace GiftyQueryLib.Queries.PostgreSQL
         {
             helper.Order(columnSelector, orderType);
             return this;
+        }
+
+        public virtual string Build()
+        {
+            return helper.ToString();
         }
     }
 }
