@@ -15,5 +15,11 @@
             typeof(int?), typeof(long?), typeof(short?), typeof(double?), typeof(decimal?),
             typeof(float?), typeof (byte?), typeof(sbyte?), typeof(uint?), typeof(ulong?)
         };
+
+        public static HashSet<Type?> FloatingNumericTypes => new()
+        {
+            typeof(float), typeof(double), typeof(decimal),
+            typeof(float?), typeof(double?), typeof(decimal?)
+        };
     }
 }

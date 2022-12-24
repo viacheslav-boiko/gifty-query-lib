@@ -90,6 +90,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     {
                         if (!config.AllowConstant)
                             throw new BuilderException(exception);
+                        sb.Append(Helper.ParseConstantExpession(cExp, paramName));
                     }
 
                     i++;
@@ -110,7 +111,15 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <returns>Expression</returns>
         protected override Expression VisitUnary(UnaryExpression u)
         {
-            string value = Helper.ExpressionTypes[u.NodeType][0];
+            if (u.NodeType == ExpressionType.Not && u.Operand is not null and MemberExpression mExp && (mExp.Type == typeof(bool) || mExp.Type == typeof(bool?)))
+            {
+                var type = mExp.Expression?.Type.ToCaseFormat(config.CaseConfig);
+                var name = mExp.Member.Name.ToCaseFormat(config.CaseConfig);
+                sb.AppendFormat(config.ColumnAccessFormat + " = FALSE ", config.Scheme, type, name);
+                return u;
+            }
+
+            var value = Helper.ExpressionTypes[u.NodeType][0];
             if (!string.IsNullOrEmpty(value))
                 sb.Append(value);
             Visit(u.Operand);
@@ -156,7 +165,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         /// <returns>Expression</returns>
         protected override Expression VisitConstant(ConstantExpression c)
         {
-            sb.Append(c.Value is null ? "NULL" : Constants.StringTypes.Contains(c.Value!.GetType()) ? string.Format("'{0}'", c.Value) : c.Value);
+            sb.Append(Helper.ParseConstantExpession(c));
             return c;
         }
 
@@ -225,7 +234,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (m.Method.DeclaringType?.Name == "Math")
             {
                 var parsed = Helper.ParseMathMethodCallExpression(m, type!);
-                sb.Append(parsed); 
+                sb.Append(parsed);
                 return m;
             }
 

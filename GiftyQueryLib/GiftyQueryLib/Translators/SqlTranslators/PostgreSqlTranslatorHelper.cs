@@ -301,6 +301,32 @@ namespace GiftyQueryLib.Translators.SqlTranslators
         #region Selector parser logic
 
         /// <summary>
+        /// Parse Constant Expression into string
+        /// </summary>
+        /// <param name="constExp"></param>
+        /// <returns></returns>
+        public virtual string? ParseConstantExpession(ConstantExpression constExp, string? paramName = null)
+        {
+            var result = constExp.Value is null
+                ? "NULL"
+                : Constants.StringTypes.Contains(constExp.Value.GetType())
+                    ? string.Format("'{0}'", constExp.Value)
+                    : Constants.FloatingNumericTypes.Contains(constExp.Value.GetType())
+                        ? constExp.Value.ToString()!.ReplaceComma()
+                        : constExp.Value.ToString();
+
+            if (paramName is not null && result is not null)
+            {
+                if (!aliases.TryAdd(paramName, result))
+                    throw new BuilderException($"Alias \"{paramName}\" already exists");
+
+                return result + $" AS {paramName}, ";
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Parse Member Expression into string
         /// </summary>
         /// <param name="memberExp"></param>
@@ -356,7 +382,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 }
 
                 var res = $"{MathFunctions[methodName].name}({translatedResult.TrimEndComma()})";
-                
+
                 if (paramName is not null)
                 {
                     if (!aliases.TryAdd(paramName, res))
@@ -741,6 +767,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 var collectionSb = new StringBuilder();
                 var isNumeric = Constants.NumericTypes.Contains(genericArg);
                 var isString = !isNumeric && Constants.StringTypes.Contains(genericArg);
+                var isFloat = !isString && Constants.FloatingNumericTypes.Contains(genericArg);
 
                 if (!isNumeric && !isString)
                     throw new BuilderException($"Invalid type {genericArg.Name} of collection");
@@ -748,7 +775,10 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 foreach (var item in collection)
                 {
                     // TODO: Create a map with default values for types
-                    var value = item is null ? (argNullable ? "NULL" : (isNumeric ? "0" : "''")) : (isString ? $"'{item}'" : item.ToString());
+                    var value = item is null
+                        ? (argNullable ? "NULL" : (isNumeric ? "0" : "''"))
+                        : (isString ? $"'{item}'" :
+                            isFloat ? item.ToString()!.ReplaceComma() : item.ToString());
                     collectionSb.Append(value + ", ");
                 }
 
@@ -857,7 +887,13 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             if (Constants.StringTypes.Contains(item.GetType()))
                 return string.Format("'{0}'", item.ToString());
             else
-                return string.Format("{0}", item.ToString());
+            {
+                var result = Constants.FloatingNumericTypes.Contains(item.GetType())
+                    ? item.ToString()!.ReplaceComma()
+                    : item.ToString();
+                return string.Format("{0}", result);
+            }
+
         }
 
         #endregion

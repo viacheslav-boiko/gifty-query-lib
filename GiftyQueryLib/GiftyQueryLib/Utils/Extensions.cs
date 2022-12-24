@@ -118,5 +118,12 @@ namespace GiftyQueryLib.Utils
             => TrimEndComma(sb.ToString(), count);
 
         #endregion
+
+        #region Float Number Extensions
+
+        public static string ReplaceComma(this string str)
+            => str.Replace(',', '.');
+
+        #endregion
     }
 }
