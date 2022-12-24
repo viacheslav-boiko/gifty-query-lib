@@ -256,7 +256,7 @@ namespace GiftyQueryLib.Builders.PostgreSql
         {
             var config = new PostgreSqlConfig(Config);
             config.CaseConfig.CaseType = caseType;
-            if (caseFormatterFunc is not null && caseType == CaseType.Custom)
+            if (caseFormatterFunc is not null)
                 config.CaseConfig.CaseFormatterFunc = caseFormatterFunc;
 
             return new PostgreSqlQuery<T>(config);

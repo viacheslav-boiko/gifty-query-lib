@@ -448,7 +448,9 @@ namespace GiftyQueryLib.Queries.PostgreSQL
             });
 
             var orderRowsSql = string.Join(',', parsed.Split(',').Select(it => it + " " + orderType.ToString().ToUpper()));
-            value.AppendFormat("ORDER BY {0} ", orderRowsSql);
+
+            if (orderType != OrderType.None)
+                value.AppendFormat("ORDER BY {0} ", orderRowsSql);
         }
 
         #endregion

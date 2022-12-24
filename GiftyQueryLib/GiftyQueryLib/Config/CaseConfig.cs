@@ -8,10 +8,10 @@ namespace GiftyQueryLib.Config
     public class CaseConfig
     {
         /// <summary>
-        /// Case Formatting for Database Objects
-        /// Default: Snake
+        /// Case Formatting for Database Objects<br/>
+        /// Default: <b>Snake</b>
         /// </summary>
-        public CaseType CaseType { get; set; }
+        public CaseType CaseType { get; set; } = CaseType.Snake;
 
         /// <summary>
         /// Custom Formatting function using when CaseType is set to the "Custom"

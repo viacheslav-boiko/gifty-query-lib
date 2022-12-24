@@ -24,7 +24,7 @@ namespace GiftyQueryLib.Utils
             {
                 CaseType.Snake => ToSnakeCase(text),
                 CaseType.Camel => ToCamelCase(text),
-                CaseType.Custom => config.CaseFormatterFunc.Invoke(text),
+                CaseType.None => config.CaseFormatterFunc.Invoke(text),
                 _ => text,
             };
         }
