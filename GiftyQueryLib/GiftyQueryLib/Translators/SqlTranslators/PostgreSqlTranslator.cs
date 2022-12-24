@@ -231,7 +231,8 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 return m;
             }
 
-            if (m.Method.DeclaringType?.Name == "Math")
+            var mathTypes = new[] { "Math", "IPostgreSqlMathFunctions" };
+            if (mathTypes.Contains(m.Method.DeclaringType?.Name))
             {
                 var parsed = Helper.ParseMathMethodCallExpression(m, type!);
                 sb.Append(parsed);

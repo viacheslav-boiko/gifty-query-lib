@@ -416,7 +416,8 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             Type? type = null;
             MemberInfo? memberInfo = null;
 
-            if (callExp.Method.DeclaringType?.Name == "Math")
+            var mathTypes = new[] { "Math", "IPostgreSqlMathFunctions" };
+            if (mathTypes.Contains(callExp.Method.DeclaringType?.Name))
                 return ParseMathMethodCallExpression(callExp, baseType, paramName);
 
             if (arguments.Count == 0 && methodName == "Alias")
@@ -893,7 +894,6 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                     : item.ToString();
                 return string.Format("{0}", result);
             }
-
         }
 
         #endregion
@@ -967,7 +967,7 @@ namespace GiftyQueryLib.Translators.SqlTranslators
             { "Pow", ("POWER", 2 ) },
             { "Round", ("ROUND", 2 ) },
             { "Radians", ("RADIANS", 1) },
-            { "Random", ("RANDOM", 1) },
+            { "Random", ("RANDOM", 0) },
             { "Sign", ("SIGN", 1) },
             { "Sin", ("SIN", 1) },
             { "Sqrt", ("SQRT", 1) },
