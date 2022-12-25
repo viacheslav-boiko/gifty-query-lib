@@ -1,5 +1,6 @@
 ﻿using GiftyQueryLib.Config;
 using GiftyQueryLib.Exceptions;
+using GiftyQueryLib.Functions.PostgreSQL;
 using GiftyQueryLib.Translators.Models;
 using GiftyQueryLib.Utils;
 using System.Linq.Expressions;
@@ -231,8 +232,8 @@ namespace GiftyQueryLib.Translators.SqlTranslators
                 return m;
             }
 
-            var mathTypes = new[] { "Math", "IPostgreSqlMathFunctions" };
-            if (mathTypes.Contains(m.Method.DeclaringType?.Name))
+            var mathTypes = new[] { typeof(Math), typeof(IPostgreSqlMathFunctions) };
+            if (mathTypes.Contains(m.Method.DeclaringType))
             {
                 var parsed = Helper.ParseMathMethodCallExpression(m, type!);
                 sb.Append(parsed);
