@@ -773,11 +773,35 @@ namespace GiftyQueryLib.Translators.SqlTranslators
 
                 foreach (var item in collection)
                 {
-                    // TODO: Create a map with default values for types
-                    var value = item is null
-                        ? (argNullable ? "NULL" : (isNumeric ? "0" : "''"))
-                        : (isString ? $"'{item}'" :
-                            isFloat ? item.ToString()!.ReplaceComma() : item.ToString());
+                    var value = string.Empty;
+
+                    if (item is null)
+                    {
+                        if (argNullable)
+                            value = "NULL";
+                        else
+                        {
+                            if (genericArg.IsValueType)
+                            {
+                                var underlying = Nullable.GetUnderlyingType(genericArg);
+                                if (underlying is not null)
+                                    value = Activator.CreateInstance(underlying)?.ToString();
+                                else
+                                    value = "0";
+                            }
+                            else
+                                value = "''";
+                        }
+                    }
+                    else
+                    {
+                        if (isString)
+                            value = $"'{item}'";
+                        else if (isFloat)
+                            value = item.ToString()?.ReplaceComma();
+                        else if (isNumeric)
+                            value = item.ToString();
+                    }
                     collectionSb.Append(value + ", ");
                 }
 
